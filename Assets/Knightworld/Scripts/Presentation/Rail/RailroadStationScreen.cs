@@ -10,7 +10,7 @@ namespace Knightworld.Presentation
         public event Action<int> BoardClicked;
         public event Action<int> AlightClicked;
         public event Action DepartClicked;
-        public event Action BuySeatsClicked;
+        public event Action ShopClicked;
 
         private static readonly Color Gold = new Color(0.95f, 0.78f, 0.16f, 1f);
         private static readonly Color GoldDark = new Color(0.28f, 0.18f, 0.04f, 1f);
@@ -26,9 +26,6 @@ namespace Knightworld.Presentation
         private Coroutine _scoreRoutine;
         private Transform _travelers;
         private Transform _passengers;
-        private Button _buySeats;
-        private Image _buySeatsImage;
-        private Text _buySeatsLabel;
 
         public bool IsOpen => _root != null && _root.activeSelf;
 
@@ -65,11 +62,10 @@ namespace Knightworld.Presentation
             var town = RailroadGraph.Get(_session.CurrentTownId);
             _heading.text = "Arrived at " + town.Name;
             _status.text = $"Score {_session.Score}    Seats {_session.Onboard.Count}/{_session.SeatCount}";
-            _message.text = message ?? "Click a traveler to board. Click a passenger to drop them off. Buy seats at the store.";
+            _message.text = message ?? "Click a traveler to board. Click a passenger to drop them off.";
             _destinations.text = RailroadHud.FormatDestinations(_session);
             FillColumn(_travelers, _session.WaitingHere, false);
             FillColumn(_passengers, _session.OnboardReadyFirst(), true);
-            RefreshStore();
         }
 
         public void PlayScoreBurst(int points)
@@ -100,18 +96,12 @@ namespace Knightworld.Presentation
             Label(card, "TravelersHeader", new Vector2(0f, 1f), new Vector2(56, -324), 24, TextAnchor.UpperLeft, new Vector2(540, 36)).text = "Travelers at this station";
             Label(card, "PassengersHeader", new Vector2(1f, 1f), new Vector2(-56, -324), 24, TextAnchor.UpperRight, new Vector2(540, 36)).text = "Passengers on the train";
 
-            _travelers = Column(card, "Travelers", new Vector2(0f, 1f), new Vector2(48, -364), new Vector2(560, 268));
-            _passengers = Column(card, "Passengers", new Vector2(1f, 1f), new Vector2(-48, -364), new Vector2(560, 268));
+            _travelers = Column(card, "Travelers", new Vector2(0f, 1f), new Vector2(48, -364), new Vector2(560, 340));
+            _passengers = Column(card, "Passengers", new Vector2(1f, 1f), new Vector2(-48, -364), new Vector2(560, 340));
 
-            Label(card, "StoreHeader", new Vector2(0f, 0f), new Vector2(56, 126), 22, TextAnchor.LowerLeft, new Vector2(280, 36)).text = "Station store";
-            var buy = MakeButton(card, "BuySeats", new Vector2(0f, 0f), new Vector2(420, 118), new Vector2(360, 64), () => BuySeatsClicked?.Invoke());
-            buy.GetComponent<Image>().color = new Color(0.22f, 0.52f, 0.34f, 0.95f);
-            _buySeats = buy.GetComponent<Button>();
-            _buySeatsImage = buy.GetComponent<Image>();
-            _buySeatsLabel = buy.transform.Find("Label").GetComponent<Text>();
-            _buySeatsLabel.text = $"+{RailSession.SeatUpgradeSeats} seats · {RailSession.SeatUpgradeCost}";
-
-            MakeButton(card, "Depart", new Vector2(0.5f, 0f), new Vector2(0, 36), new Vector2(280, 64), () => DepartClicked?.Invoke());
+            var shop = MakeButton(card, "Shop", new Vector2(0.5f, 0f), new Vector2(-170, 36), new Vector2(280, 64), () => ShopClicked?.Invoke());
+            shop.GetComponent<Image>().color = new Color(0.22f, 0.52f, 0.34f, 0.95f);
+            MakeButton(card, "Depart", new Vector2(0.5f, 0f), new Vector2(170, 36), new Vector2(280, 64), () => DepartClicked?.Invoke());
 
             _scoreBurst = Label(_root, "ScoreBurst", new Vector2(0.5f, 0.5f), new Vector2(0, 90), 92, TextAnchor.MiddleCenter, new Vector2(600, 140));
             _scoreBurst.alignment = TextAnchor.MiddleCenter;
@@ -121,19 +111,6 @@ namespace Knightworld.Presentation
             _scoreBurstRect = _scoreBurst.GetComponent<RectTransform>();
             _scoreBurstRect.pivot = new Vector2(0.5f, 0.5f);
             _scoreBurst.gameObject.SetActive(false);
-        }
-
-        private void RefreshStore()
-        {
-            if (_buySeats == null)
-                return;
-            bool canBuy = _session.Score >= RailSession.SeatUpgradeCost;
-            _buySeats.interactable = canBuy;
-            _buySeatsImage.color = canBuy
-                ? new Color(0.22f, 0.52f, 0.34f, 0.95f)
-                : new Color(0.28f, 0.30f, 0.32f, 0.9f);
-            _buySeatsLabel.text = $"+{RailSession.SeatUpgradeSeats} seats · {RailSession.SeatUpgradeCost}";
-            _buySeatsLabel.color = canBuy ? Color.white : new Color(0.72f, 0.74f, 0.76f);
         }
 
         private void FillColumn(Transform column, System.Collections.Generic.IReadOnlyList<Passenger> people, bool onboard)

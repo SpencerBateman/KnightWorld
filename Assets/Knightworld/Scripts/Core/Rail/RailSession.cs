@@ -54,7 +54,10 @@ namespace Knightworld.Core
     {
         public const int StartingSeats = 1;
         public const int SeatUpgradeCost = 50;
-        public const int SeatUpgradeSeats = 2;
+        public const int SeatUpgradeSeats = 1;
+        public const int SeatUpgradeStock = 2;
+        public const int CarriageCost = 350;
+        public const int CarriageSeats = 6;
         public const int MaxWaitingPerTown = 4;
         public static readonly string[] Names =
         {
@@ -67,11 +70,15 @@ namespace Knightworld.Core
 
         public int Score { get; private set; }
         public int SeatCount { get; private set; } = StartingSeats;
+        public int SeatUpgradesBought { get; private set; }
+        public int CarriagesBought { get; private set; }
         public string CurrentTownId { get; private set; }
         public List<Passenger> Onboard { get; } = new List<Passenger>();
         public Dictionary<string, List<Passenger>> Waiting { get; } = new Dictionary<string, List<Passenger>>();
 
         public int FreeSeats => SeatCount - Onboard.Count;
+        public int SeatUpgradesLeft => SeatUpgradeStock - SeatUpgradesBought;
+        public bool HasCarriage => CarriagesBought > 0;
 
         public RailSession(IRandom random, string startTownId)
         {
@@ -123,10 +130,21 @@ namespace Knightworld.Core
 
         public bool TryBuySeatUpgrade()
         {
-            if (Score < SeatUpgradeCost)
+            if (SeatUpgradesLeft <= 0 || Score < SeatUpgradeCost)
                 return false;
             Score -= SeatUpgradeCost;
             SeatCount += SeatUpgradeSeats;
+            SeatUpgradesBought++;
+            return true;
+        }
+
+        public bool TryBuyCarriage()
+        {
+            if (HasCarriage || Score < CarriageCost)
+                return false;
+            Score -= CarriageCost;
+            SeatCount += CarriageSeats;
+            CarriagesBought++;
             return true;
         }
 

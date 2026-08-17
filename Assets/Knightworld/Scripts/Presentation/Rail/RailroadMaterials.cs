@@ -13,6 +13,31 @@ namespace Knightworld.Presentation
         public static Material TrainDark { get; private set; }
         public static Material SeatEmpty { get; private set; }
         public static Material Shop { get; private set; }
+        public static Material Meadow { get; private set; }
+        public static Material DeepGrass { get; private set; }
+        public static Material Earth { get; private set; }
+        public static Material ShallowWater { get; private set; }
+        public static Material DeepWater { get; private set; }
+        public static Material MarshWater { get; private set; }
+        public static Material Sand { get; private set; }
+        public static Material Shore { get; private set; }
+        public static Material Trunk { get; private set; }
+        public static Material Leaf { get; private set; }
+        public static Material LeafDark { get; private set; }
+        public static Material Pine { get; private set; }
+        public static Material Frond { get; private set; }
+        public static Material Rock { get; private set; }
+        public static Material RockWarm { get; private set; }
+        public static Material RockDark { get; private set; }
+        public static Material Peak { get; private set; }
+        public static Material PeakShade { get; private set; }
+        public static Material Snow { get; private set; }
+        public static Material Cloud { get; private set; }
+        public static Material CloudShade { get; private set; }
+        public static Material Cliff { get; private set; }
+        public static Material Sun { get; private set; }
+        public static Material Haze { get; private set; }
+        public static Material Gravel { get; private set; }
         private static readonly System.Collections.Generic.Dictionary<string, Material> ExtraTowns =
             new System.Collections.Generic.Dictionary<string, Material>();
         public static Material Millhaven { get; private set; }
@@ -39,6 +64,31 @@ namespace Knightworld.Presentation
             TrainDark = Make(new Color(0.18f, 0.18f, 0.20f));
             SeatEmpty = Make(new Color(0.42f, 0.42f, 0.44f));
             Shop = Make(new Color(0.52f, 0.34f, 0.18f));
+            Meadow = Make(new Color(0.55f, 0.72f, 0.38f));
+            DeepGrass = Make(new Color(0.28f, 0.50f, 0.26f));
+            Earth = Make(new Color(0.42f, 0.34f, 0.22f));
+            ShallowWater = Make(new Color(0.38f, 0.72f, 0.78f));
+            DeepWater = Make(new Color(0.18f, 0.48f, 0.68f));
+            MarshWater = Make(new Color(0.32f, 0.52f, 0.38f));
+            Sand = Make(new Color(0.84f, 0.76f, 0.55f));
+            Shore = Make(new Color(0.62f, 0.78f, 0.72f));
+            Trunk = Make(new Color(0.38f, 0.24f, 0.14f));
+            Leaf = Make(new Color(0.30f, 0.62f, 0.32f));
+            LeafDark = Make(new Color(0.18f, 0.42f, 0.24f));
+            Pine = Make(new Color(0.16f, 0.38f, 0.28f));
+            Frond = Make(new Color(0.22f, 0.58f, 0.30f));
+            Rock = Make(new Color(0.55f, 0.52f, 0.48f));
+            RockWarm = Make(new Color(0.62f, 0.50f, 0.40f));
+            RockDark = Make(new Color(0.36f, 0.34f, 0.32f));
+            Peak = Make(new Color(0.42f, 0.48f, 0.44f));
+            PeakShade = Make(new Color(0.32f, 0.36f, 0.34f));
+            Snow = Make(new Color(0.92f, 0.95f, 0.97f));
+            Cloud = Make(new Color(0.95f, 0.96f, 0.98f));
+            CloudShade = Make(new Color(0.82f, 0.86f, 0.90f));
+            Cliff = Make(new Color(0.48f, 0.42f, 0.38f));
+            Sun = Make(new Color(1f, 0.92f, 0.62f));
+            Haze = Make(new Color(0.70f, 0.80f, 0.72f));
+            Gravel = Make(new Color(0.50f, 0.42f, 0.32f));
             Millhaven = Make(new Color(0.82f, 0.70f, 0.28f));
             Lakeside = Make(new Color(0.25f, 0.52f, 0.82f));
             Hillcrest = Make(new Color(0.32f, 0.68f, 0.38f));

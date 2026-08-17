@@ -14,6 +14,7 @@ namespace Knightworld.Presentation
         private Text _tooltip;
 
         public RailroadStationScreen Station { get; private set; }
+        public RailroadShopScreen Shop { get; private set; }
 
         public static RailroadHud Create()
         {
@@ -35,6 +36,7 @@ namespace Knightworld.Presentation
             var hud = canvasGo.AddComponent<RailroadHud>();
             hud.Build();
             hud.Station = RailroadStationScreen.Create(canvasGo.transform);
+            hud.Shop = RailroadShopScreen.Create(canvasGo.transform);
             return hud;
         }
 
@@ -64,7 +66,7 @@ namespace Knightworld.Presentation
             _cargo = CreateText("Cargo", new Vector2(0f, 0f), new Vector2(28, 28), 20, TextAnchor.LowerLeft, new Vector2(520, 400));
             _tooltip = CreateText("Tooltip", new Vector2(0.5f, 0f), new Vector2(0, 28), 22, TextAnchor.LowerCenter, new Vector2(1100, 80));
             var hint = CreateText("Hint", new Vector2(1f, 0f), new Vector2(-28, 28), 18, TextAnchor.LowerRight, new Vector2(520, 90));
-            hint.text = "Click a town to ride.\nStations have a store. +2 seats cost 50.";
+            hint.text = "Click a town to ride.\nOpen the shop for extra seats and a carriage.";
             _title.text = RailroadGraph.Map.Title;
         }
 

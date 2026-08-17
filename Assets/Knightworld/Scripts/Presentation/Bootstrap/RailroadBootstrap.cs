@@ -34,11 +34,12 @@ namespace Knightworld.Bootstrap
             var iso = camera.GetComponent<IsoCameraController>();
             if (iso == null)
                 iso = camera.gameObject.AddComponent<IsoCameraController>();
-            iso.Distance = Mathf.Clamp(view.Radius * 1.55f + 10f, 16f, 64f);
-            iso.MinDistance = 14f;
-            iso.MaxDistance = iso.Distance + 28f;
+            iso.Distance = Mathf.Clamp(view.Radius * 1.85f + 12f, 18f, 80f);
+            iso.MinDistance = 16f;
+            iso.MaxDistance = iso.Distance + 40f;
             iso.Pitch = 52f;
             iso.FocusImmediate(view.Center);
+            view.ApplyCamera(camera);
 
             var hud = RailroadHud.Create();
             var controller = gameObject.AddComponent<RailroadController>();

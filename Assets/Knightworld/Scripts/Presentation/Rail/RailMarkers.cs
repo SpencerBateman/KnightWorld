@@ -7,6 +7,11 @@ namespace Knightworld.Presentation
         public string TownId;
     }
 
+    public sealed class ShopMarker : MonoBehaviour
+    {
+        public string TownId;
+    }
+
     public sealed class PassengerMarker : MonoBehaviour
     {
         public int PassengerId;

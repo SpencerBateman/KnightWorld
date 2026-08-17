@@ -17,6 +17,7 @@ namespace Knightworld.Presentation
         private Transform _passengerRoot;
         private Transform _seatRoot;
         private Transform _car;
+        private RailroadScenery _scenery;
 
         public RailroadView(Transform root)
         {
@@ -30,7 +31,8 @@ namespace Knightworld.Presentation
         public void Build()
         {
             RailroadMaterials.Ensure();
-            DrawGround();
+            _scenery = new RailroadScenery(_root, this);
+            _scenery.Build();
             DrawRails();
             DrawTowns();
             _passengerRoot = new GameObject("Passengers").transform;
@@ -49,6 +51,12 @@ namespace Knightworld.Presentation
                     radius = d;
             }
             Radius = radius;
+        }
+
+        public void ApplyCamera(Camera camera)
+        {
+            if (_scenery != null)
+                _scenery.ApplyCamera(camera);
         }
 
         public Vector3 WorldPos(TownDef town) => new Vector3(town.X * WorldScale, 0f, town.Z * WorldScale);
@@ -205,54 +213,6 @@ namespace Knightworld.Presentation
             _seats.Add(seat.GetComponent<Renderer>());
         }
 
-        private void DrawGround()
-        {
-            Vector3 min = new Vector3(float.MaxValue, 0f, float.MaxValue);
-            Vector3 max = new Vector3(float.MinValue, 0f, float.MinValue);
-            foreach (var town in RailroadGraph.Towns)
-            {
-                Vector3 pos = WorldPos(town);
-                min = Vector3.Min(min, pos);
-                max = Vector3.Max(max, pos);
-            }
-
-            Vector3 center = (min + max) * 0.5f;
-            Vector3 size = max - min;
-            float pad = 14f;
-            var field = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            field.name = "Ground";
-            field.transform.SetParent(_root, false);
-            field.transform.position = new Vector3(center.x, 0f, center.z);
-            field.transform.localScale = new Vector3((size.x + pad) / 10f, 1f, (size.z + pad) / 10f);
-            field.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Grass;
-            Object.Destroy(field.GetComponent<Collider>());
-
-            Hill(center + new Vector3(-size.x * 0.65f - 4f, -0.4f, -size.z * 0.35f - 2f), new Vector3(7f, 2.0f, 5f));
-            Hill(center + new Vector3(size.x * 0.6f + 4f, -0.5f, size.z * 0.2f), new Vector3(6f, 2.2f, 5.5f));
-            Hill(center + new Vector3(-size.x * 0.5f - 3f, -0.35f, size.z * 0.55f + 3f), new Vector3(5.5f, 1.8f, 5f));
-            Hill(center + new Vector3(size.x * 0.15f, -0.6f, size.z * 0.7f + 4f), new Vector3(6.5f, 2.4f, 5f));
-
-            foreach (var landmark in RailroadGraph.Map.Landmarks)
-            {
-                Vector3 at = WorldPos(RailroadGraph.Get(landmark.TownId));
-                if (landmark.Kind == LandmarkDef.Lake)
-                    Water("Lake", at + new Vector3(2.8f, 0.02f, -2.2f), new Vector3(4.2f, 0.04f, 2.6f));
-                else if (landmark.Kind == LandmarkDef.Marsh)
-                    Water("Marsh", at + new Vector3(2.4f, 0.02f, -1.8f), new Vector3(3.4f, 0.04f, 2.2f));
-            }
-        }
-
-        private void Water(string name, Vector3 position, Vector3 scale)
-        {
-            var pond = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            pond.name = name;
-            pond.transform.SetParent(_root, false);
-            pond.transform.position = position;
-            pond.transform.localScale = scale;
-            pond.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Water;
-            Object.Destroy(pond.GetComponent<Collider>());
-        }
-
         private void DrawRails()
         {
             var drawn = new HashSet<string>();
@@ -283,6 +243,15 @@ namespace Knightworld.Presentation
             rails.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Rail;
             Object.Destroy(rails.GetComponent<Collider>());
 
+            var bed = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            bed.name = "Ballast";
+            bed.transform.SetParent(_root, false);
+            bed.transform.position = (a + b) * 0.5f + Vector3.down * 0.02f;
+            bed.transform.rotation = rails.transform.rotation;
+            bed.transform.localScale = new Vector3(0.95f, 0.05f, length);
+            bed.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Gravel;
+            Object.Destroy(bed.GetComponent<Collider>());
+
             int ties = Mathf.Max(2, Mathf.RoundToInt(length / 0.85f));
             for (int i = 0; i <= ties; i++)
             {
@@ -312,7 +281,7 @@ namespace Knightworld.Presentation
 
                 House(WorldPos(town) + new Vector3(-0.55f, 0.45f, -0.35f), RailroadMaterials.Town(town.Id));
                 House(WorldPos(town) + new Vector3(0.45f, 0.38f, -0.55f), RailroadMaterials.TrainDark);
-                Store(WorldPos(town) + new Vector3(1.15f, 0.42f, 0.55f), RailroadMaterials.Town(town.Id));
+                Store(WorldPos(town) + new Vector3(1.15f, 0.42f, 0.55f), RailroadMaterials.Town(town.Id), town.Id);
 
                 var hit = new GameObject("Hit " + town.Id);
                 hit.transform.SetParent(_root, false);
@@ -324,7 +293,7 @@ namespace Knightworld.Presentation
 
                 var label = new GameObject("Label " + town.Name);
                 label.transform.SetParent(_root, false);
-                label.transform.position = WorldPos(town) + Vector3.up * 2.05f;
+                label.transform.position = WorldPos(town) + Vector3.up * 2.55f;
                 var mesh = label.AddComponent<TextMesh>();
                 mesh.text = town.Name;
                 mesh.fontSize = 48;
@@ -350,7 +319,7 @@ namespace Knightworld.Presentation
             Object.Destroy(go.GetComponent<Collider>());
         }
 
-        private void Store(Vector3 position, Material awning)
+        private void Store(Vector3 position, Material awning, string townId)
         {
             var stall = GameObject.CreatePrimitive(PrimitiveType.Cube);
             stall.name = "Store";
@@ -358,7 +327,8 @@ namespace Knightworld.Presentation
             stall.transform.position = position;
             stall.transform.localScale = new Vector3(0.85f, 0.55f, 0.7f);
             stall.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Shop;
-            Object.Destroy(stall.GetComponent<Collider>());
+            var marker = stall.AddComponent<ShopMarker>();
+            marker.TownId = townId;
 
             var roof = GameObject.CreatePrimitive(PrimitiveType.Cube);
             roof.name = "Awning";
@@ -375,17 +345,6 @@ namespace Knightworld.Presentation
             crate.transform.localScale = new Vector3(0.28f, 0.28f, 0.28f);
             crate.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Tie;
             Object.Destroy(crate.GetComponent<Collider>());
-        }
-
-        private void Hill(Vector3 position, Vector3 scale)
-        {
-            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            go.name = "Hill";
-            go.transform.SetParent(_root, false);
-            go.transform.position = position;
-            go.transform.localScale = scale;
-            go.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Hill;
-            Object.Destroy(go.GetComponent<Collider>());
         }
     }
 }

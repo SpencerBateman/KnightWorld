@@ -98,20 +98,42 @@ namespace Knightworld.Tests
         }
 
         [Test]
-        public void SeatUpgradeCostsFiftyAndAddsTwoSeats()
+        public void SeatUpgradeCostsFiftyAndAddsOneSeat()
         {
             var session = NewSession();
+            Assert.AreEqual(2, RailSession.SeatUpgradeStock);
             Assert.IsFalse(session.TryBuySeatUpgrade());
             session.Grant(RailSession.SeatUpgradeCost - 1);
             Assert.IsFalse(session.TryBuySeatUpgrade());
             session.Grant(1);
             Assert.IsTrue(session.TryBuySeatUpgrade());
             Assert.AreEqual(0, session.Score);
-            Assert.AreEqual(3, session.SeatCount);
-            Assert.AreEqual(3, session.FreeSeats);
+            Assert.AreEqual(2, session.SeatCount);
+            Assert.AreEqual(1, session.SeatUpgradesLeft);
             session.Grant(RailSession.SeatUpgradeCost);
             Assert.IsTrue(session.TryBuySeatUpgrade());
-            Assert.AreEqual(5, session.SeatCount);
+            Assert.AreEqual(3, session.SeatCount);
+            Assert.AreEqual(0, session.SeatUpgradesLeft);
+            session.Grant(RailSession.SeatUpgradeCost);
+            Assert.IsFalse(session.TryBuySeatUpgrade());
+            Assert.AreEqual(3, session.SeatCount);
+        }
+
+        [Test]
+        public void CarriageCostsThreeFiftyAndAddsSixSeatsOnce()
+        {
+            var session = NewSession();
+            Assert.IsFalse(session.TryBuyCarriage());
+            session.Grant(RailSession.CarriageCost - 1);
+            Assert.IsFalse(session.TryBuyCarriage());
+            session.Grant(1);
+            Assert.IsTrue(session.TryBuyCarriage());
+            Assert.AreEqual(0, session.Score);
+            Assert.AreEqual(7, session.SeatCount);
+            Assert.IsTrue(session.HasCarriage);
+            session.Grant(RailSession.CarriageCost);
+            Assert.IsFalse(session.TryBuyCarriage());
+            Assert.AreEqual(7, session.SeatCount);
         }
 
         [Test]
@@ -262,8 +284,15 @@ namespace Knightworld.Tests
         {
             while (session.SeatCount < seats)
             {
-                session.Grant(RailSession.SeatUpgradeCost);
-                Assert.IsTrue(session.TryBuySeatUpgrade());
+                if (session.SeatUpgradesLeft > 0)
+                {
+                    session.Grant(RailSession.SeatUpgradeCost);
+                    Assert.IsTrue(session.TryBuySeatUpgrade());
+                    continue;
+                }
+
+                session.Grant(RailSession.CarriageCost);
+                Assert.IsTrue(session.TryBuyCarriage());
             }
         }
     }

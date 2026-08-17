@@ -15,6 +15,7 @@ namespace Knightworld.Presentation
         private RailroadView _view;
         private RailroadHud _hud;
         private RailroadStationScreen _station;
+        private RailroadShopScreen _shop;
         private Camera _camera;
         private bool _busy;
         private float _spawnTimer;
@@ -26,25 +27,39 @@ namespace Knightworld.Presentation
             _view = view;
             _hud = hud;
             _station = hud.Station;
+            _shop = hud.Shop;
             _camera = worldCamera;
             _spawnTimer = SpawnSeconds;
             _station.BoardClicked += OnBoard;
             _station.AlightClicked += OnAlight;
             _station.DepartClicked += OnDepart;
-            _station.BuySeatsClicked += OnBuySeats;
+            _station.ShopClicked += OnOpenShop;
+            _shop.BuySeatClicked += OnBuySeat;
+            _shop.BuyCarriageClicked += OnBuyCarriage;
+            _shop.BackClicked += OnShopBack;
             _view.RefreshPassengers(_session);
             _hud.Refresh(_session, null);
-            OpenStation("Click a traveler to add them. Click a passenger to drop them off. Buy extra seats at the store.");
+            OpenStation("Click a traveler to add them. Click a passenger to drop them off.");
         }
+
+        private bool UiOpen => (_station != null && _station.IsOpen) || (_shop != null && _shop.IsOpen);
 
         private void OnDestroy()
         {
-            if (_station == null)
-                return;
-            _station.BoardClicked -= OnBoard;
-            _station.AlightClicked -= OnAlight;
-            _station.DepartClicked -= OnDepart;
-            _station.BuySeatsClicked -= OnBuySeats;
+            if (_station != null)
+            {
+                _station.BoardClicked -= OnBoard;
+                _station.AlightClicked -= OnAlight;
+                _station.DepartClicked -= OnDepart;
+                _station.ShopClicked -= OnOpenShop;
+            }
+
+            if (_shop != null)
+            {
+                _shop.BuySeatClicked -= OnBuySeat;
+                _shop.BuyCarriageClicked -= OnBuyCarriage;
+                _shop.BackClicked -= OnShopBack;
+            }
         }
 
         private void Update()
@@ -62,6 +77,8 @@ namespace Knightworld.Presentation
                         _view.RefreshPassengers(_session);
                         if (_station.IsOpen)
                             _station.Refresh(null);
+                        if (_shop != null && _shop.IsOpen)
+                            _shop.Refresh(null);
                     }
 
                     _spawnTimer = SpawnSeconds;
@@ -69,7 +86,7 @@ namespace Knightworld.Presentation
                 }
             }
 
-            if (_busy || _station.IsOpen)
+            if (_busy || UiOpen)
                 return;
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             {
@@ -128,25 +145,69 @@ namespace Knightworld.Presentation
                 _station.PlayScoreBurst(fare);
         }
 
-        private void OnBuySeats()
+        private void OnOpenShop()
+        {
+            OpenShop("Spend your fare on train upgrades.");
+        }
+
+        private void OpenShop(string message)
+        {
+            _shop.Open(_session, message);
+            _hud.Refresh(_session, _banner);
+        }
+
+        private void OnBuySeat()
         {
             if (_session.TryBuySeatUpgrade())
             {
-                _view.SyncSeats(_session.SeatCount);
-                _banner = $"Bought two seats. Capacity is now {_session.SeatCount}.";
-                _view.RefreshPassengers(_session);
-                _hud.Refresh(_session, _banner);
-                _station.Refresh(_banner);
+                AfterUpgrade($"Fitted an extra seat. Capacity is now {_session.SeatCount}.");
                 return;
             }
 
-            _banner = $"Need {RailSession.SeatUpgradeCost} points for two seats.";
-            _station.Refresh(_banner);
+            _banner = _session.SeatUpgradesLeft <= 0
+                ? "No extra seats left to buy."
+                : $"Need {RailSession.SeatUpgradeCost} points for an extra seat.";
+            _shop.Refresh(_banner);
+            _hud.Refresh(_session, _banner);
+        }
+
+        private void OnBuyCarriage()
+        {
+            if (_session.TryBuyCarriage())
+            {
+                AfterUpgrade($"Hitched a passenger carriage. Capacity is now {_session.SeatCount}.");
+                return;
+            }
+
+            _banner = _session.HasCarriage
+                ? "You already have a passenger carriage."
+                : $"Need {RailSession.CarriageCost} points for a passenger carriage.";
+            _shop.Refresh(_banner);
+            _hud.Refresh(_session, _banner);
+        }
+
+        private void AfterUpgrade(string banner)
+        {
+            _banner = banner;
+            _view.SyncSeats(_session.SeatCount);
+            _view.RefreshPassengers(_session);
+            _hud.Refresh(_session, _banner);
+            _shop.Refresh(_banner);
+            if (_station.IsOpen)
+                _station.Refresh(_banner);
+        }
+
+        private void OnShopBack()
+        {
+            _shop.Close();
+            if (_station.IsOpen)
+                _station.Refresh(null);
             _hud.Refresh(_session, _banner);
         }
 
         private void OnDepart()
         {
+            _shop.Close();
             _station.Close();
             _banner = "Choose a town to ride to.";
             _hud.Refresh(_session, _banner);
@@ -154,6 +215,12 @@ namespace Knightworld.Presentation
 
         private void TryHover()
         {
+            if (TryPickShop(out var shopTown) && shopTown == _session.CurrentTownId)
+            {
+                _hud.SetTooltip("Open the shop.");
+                return;
+            }
+
             if (!TryPickTown(out var townId))
             {
                 _hud.SetTooltip("");
@@ -169,11 +236,17 @@ namespace Knightworld.Presentation
 
         private void HandleClick()
         {
+            if (TryPickShop(out var shopTown) && shopTown == _session.CurrentTownId)
+            {
+                OpenShop("Spend your fare on train upgrades.");
+                return;
+            }
+
             if (!TryPickTown(out var townId))
                 return;
             if (townId == _session.CurrentTownId)
             {
-                OpenStation("Click a traveler to add them. Click a passenger to drop them off. Buy extra seats at the store.");
+                OpenStation("Click a traveler to add them. Click a passenger to drop them off.");
                 return;
             }
 
@@ -197,7 +270,7 @@ namespace Knightworld.Presentation
             _banner = "Arrived at " + town.Name + ".";
             _hud.Refresh(_session, _banner);
             _busy = false;
-            OpenStation($"Arrived at {town.Name}. Board travelers, drop passengers, or buy seats at the store.");
+            OpenStation($"Arrived at {town.Name}. Board travelers, drop passengers, or visit the shop.");
         }
 
         private IEnumerator Hop(string fromId, string toId)
@@ -242,6 +315,27 @@ namespace Knightworld.Presentation
                     continue;
                 townId = town.TownId;
                 townDist = hits[i].distance;
+            }
+
+            return townId != null;
+        }
+
+        private bool TryPickShop(out string townId)
+        {
+            townId = null;
+            var camera = _camera != null ? _camera : Camera.main;
+            if (camera == null || Mouse.current == null)
+                return false;
+            var ray = camera.ScreenPointToRay(Mouse.current.position.ReadValue());
+            var hits = Physics.RaycastAll(ray, 140f);
+            float shopDist = float.MaxValue;
+            for (int i = 0; i < hits.Length; i++)
+            {
+                var shop = hits[i].collider.GetComponentInParent<ShopMarker>();
+                if (shop == null || hits[i].distance >= shopDist)
+                    continue;
+                townId = shop.TownId;
+                shopDist = hits[i].distance;
             }
 
             return townId != null;

@@ -34,19 +34,23 @@ minhop 0.7
 
 town tutorialIsland Tutorial1
 town outskirts Outskirts
-
+town ev East
+town wv West
 town ny NewYork
 town sc SanClemente
 town sd SanDiego
 
 track tutorialIsland sc 4
 track tutorialIsland sd 3
-
 track tutorialIsland outskirts 6
 track ny outskirts 7
 
 track ny sc 20
 track sc sd 3
+track ev ny 4
+track wv ny 4
+track wv ev 2
+
 
 
 # landmark lake lakeside
