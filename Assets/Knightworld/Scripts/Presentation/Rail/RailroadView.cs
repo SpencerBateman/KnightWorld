@@ -1,0 +1,312 @@
+using System.Collections.Generic;
+using Knightworld.Core;
+using UnityEngine;
+
+namespace Knightworld.Presentation
+{
+    public sealed class RailroadView
+    {
+        public const float WorldScale = 1.65f;
+        public const float TrainY = 0.42f;
+
+        private readonly Transform _root;
+        private readonly Dictionary<int, Transform> _waiting = new Dictionary<int, Transform>();
+        private readonly List<Renderer> _seats = new List<Renderer>();
+        private readonly List<Transform> _labels = new List<Transform>();
+        private Transform _train;
+        private Transform _passengerRoot;
+
+        public RailroadView(Transform root)
+        {
+            _root = root;
+        }
+
+        public Vector3 Center { get; private set; }
+        public Transform Train => _train;
+
+        public void Build()
+        {
+            RailroadMaterials.Ensure();
+            DrawGround();
+            DrawRails();
+            DrawTowns();
+            _passengerRoot = new GameObject("Passengers").transform;
+            _passengerRoot.SetParent(_root, false);
+            _train = SpawnTrain();
+            SnapTrain(RailroadGraph.Millhaven);
+            Vector3 sum = Vector3.zero;
+            foreach (var town in RailroadGraph.Towns)
+                sum += WorldPos(town);
+            Center = sum / RailroadGraph.Towns.Count;
+        }
+
+        public Vector3 WorldPos(TownDef town) => new Vector3(town.X * WorldScale, 0f, town.Z * WorldScale);
+
+        public Vector3 TrainPos(string townId) => WorldPos(RailroadGraph.Get(townId)) + Vector3.up * TrainY;
+
+        public void SnapTrain(string townId)
+        {
+            if (_train == null)
+                return;
+            _train.position = TrainPos(townId);
+        }
+
+        public void FaceLabels(Camera camera)
+        {
+            if (camera == null)
+                return;
+            for (int i = 0; i < _labels.Count; i++)
+            {
+                Vector3 away = _labels[i].position - camera.transform.position;
+                if (away.sqrMagnitude > 0.001f)
+                    _labels[i].rotation = Quaternion.LookRotation(away);
+            }
+        }
+
+        public void RefreshPassengers(RailSession session)
+        {
+            var keep = new HashSet<int>();
+            foreach (var town in RailroadGraph.Towns)
+            {
+                var waiting = session.Waiting[town.Id];
+                Vector3 origin = WorldPos(town);
+                Vector3 side = new Vector3(-0.85f, 0f, 1.55f);
+                for (int i = 0; i < waiting.Count; i++)
+                {
+                    var person = waiting[i];
+                    keep.Add(person.Id);
+                    if (!_waiting.TryGetValue(person.Id, out var body))
+                    {
+                        body = SpawnPerson(person);
+                        _waiting[person.Id] = body;
+                    }
+
+                    body.position = origin + side + new Vector3(0.7f * i, 0.45f, 0f);
+                }
+            }
+
+            var remove = new List<int>();
+            foreach (var pair in _waiting)
+            {
+                if (keep.Contains(pair.Key))
+                    continue;
+                Object.Destroy(pair.Value.gameObject);
+                remove.Add(pair.Key);
+            }
+
+            for (int i = 0; i < remove.Count; i++)
+                _waiting.Remove(remove[i]);
+
+            for (int i = 0; i < _seats.Count; i++)
+            {
+                if (i < session.Onboard.Count)
+                    _seats[i].sharedMaterial = RailroadMaterials.Town(session.Onboard[i].DestId);
+                else
+                    _seats[i].sharedMaterial = RailroadMaterials.SeatEmpty;
+            }
+        }
+
+        private Transform SpawnPerson(Passenger person)
+        {
+            var go = new GameObject(person.Name);
+            go.transform.SetParent(_passengerRoot, false);
+            var marker = go.AddComponent<PassengerMarker>();
+            marker.PassengerId = person.Id;
+            var hit = go.AddComponent<SphereCollider>();
+            hit.radius = 0.42f;
+
+            var body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            body.name = "Body";
+            body.transform.SetParent(go.transform, false);
+            body.transform.localPosition = Vector3.zero;
+            body.transform.localScale = new Vector3(0.32f, 0.38f, 0.32f);
+            body.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Town(person.DestId);
+            Object.Destroy(body.GetComponent<Collider>());
+            return go.transform;
+        }
+
+        private Transform SpawnTrain()
+        {
+            var root = new GameObject("Train").transform;
+            root.SetParent(_root, false);
+
+            var engine = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            engine.name = "Engine";
+            engine.transform.SetParent(root, false);
+            engine.transform.localPosition = new Vector3(0f, 0.28f, 0.55f);
+            engine.transform.localScale = new Vector3(0.7f, 0.55f, 1.1f);
+            engine.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Train;
+            Object.Destroy(engine.GetComponent<Collider>());
+
+            var cabin = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            cabin.name = "Cabin";
+            cabin.transform.SetParent(root, false);
+            cabin.transform.localPosition = new Vector3(0f, 0.55f, 0.25f);
+            cabin.transform.localScale = new Vector3(0.62f, 0.42f, 0.5f);
+            cabin.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.TrainDark;
+            Object.Destroy(cabin.GetComponent<Collider>());
+
+            var stack = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            stack.name = "Stack";
+            stack.transform.SetParent(root, false);
+            stack.transform.localPosition = new Vector3(0f, 0.72f, 0.85f);
+            stack.transform.localScale = new Vector3(0.16f, 0.18f, 0.16f);
+            stack.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.TrainDark;
+            Object.Destroy(stack.GetComponent<Collider>());
+
+            var car = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            car.name = "Car";
+            car.transform.SetParent(root, false);
+            car.transform.localPosition = new Vector3(0f, 0.32f, -0.85f);
+            car.transform.localScale = new Vector3(0.72f, 0.38f, 1.5f);
+            car.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Train;
+            Object.Destroy(car.GetComponent<Collider>());
+
+            for (int i = 0; i < RailSession.SeatCount; i++)
+            {
+                int row = i / 5;
+                int col = i % 5;
+                var seat = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                seat.name = "Seat " + i;
+                seat.transform.SetParent(root, false);
+                seat.transform.localPosition = new Vector3(-0.22f + col * 0.11f, 0.58f, -0.35f - row * 0.42f);
+                seat.transform.localScale = new Vector3(0.1f, 0.12f, 0.16f);
+                seat.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.SeatEmpty;
+                Object.Destroy(seat.GetComponent<Collider>());
+                _seats.Add(seat.GetComponent<Renderer>());
+            }
+
+            return root;
+        }
+
+        private void DrawGround()
+        {
+            var field = GameObject.CreatePrimitive(PrimitiveType.Plane);
+            field.name = "Ground";
+            field.transform.SetParent(_root, false);
+            field.transform.position = new Vector3(0.5f, 0f, 2f);
+            field.transform.localScale = new Vector3(4.6f, 1f, 4.4f);
+            field.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Grass;
+            Object.Destroy(field.GetComponent<Collider>());
+
+            Hill(new Vector3(-11f, -0.4f, -6f), new Vector3(6f, 1.8f, 4.5f));
+            Hill(new Vector3(12f, -0.5f, 8f), new Vector3(5.5f, 2.1f, 5f));
+            Hill(new Vector3(-10f, -0.35f, 11f), new Vector3(4.5f, 1.6f, 4f));
+
+            var pond = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            pond.name = "Lake";
+            pond.transform.SetParent(_root, false);
+            pond.transform.position = WorldPos(RailroadGraph.Get(RailroadGraph.Lakeside)) + new Vector3(2.8f, 0.02f, -2.2f);
+            pond.transform.localScale = new Vector3(4.2f, 0.04f, 2.6f);
+            pond.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Water;
+            Object.Destroy(pond.GetComponent<Collider>());
+        }
+
+        private void DrawRails()
+        {
+            var drawn = new HashSet<string>();
+            foreach (var town in RailroadGraph.Towns)
+            {
+                foreach (var link in town.Links)
+                {
+                    string key = town.Id.CompareTo(link) < 0 ? town.Id + ">" + link : link + ">" + town.Id;
+                    if (!drawn.Add(key))
+                        continue;
+                    Vector3 a = WorldPos(town) + Vector3.up * 0.05f;
+                    Vector3 b = WorldPos(RailroadGraph.Get(link)) + Vector3.up * 0.05f;
+                    DrawTrack(a, b);
+                }
+            }
+        }
+
+        private void DrawTrack(Vector3 a, Vector3 b)
+        {
+            Vector3 delta = b - a;
+            float length = delta.magnitude;
+            var rails = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            rails.name = "Rails";
+            rails.transform.SetParent(_root, false);
+            rails.transform.position = (a + b) * 0.5f;
+            rails.transform.rotation = Quaternion.LookRotation(delta.sqrMagnitude > 0.001f ? delta : Vector3.forward);
+            rails.transform.localScale = new Vector3(0.42f, 0.06f, length);
+            rails.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Rail;
+            Object.Destroy(rails.GetComponent<Collider>());
+
+            int ties = Mathf.Max(2, Mathf.RoundToInt(length / 0.85f));
+            for (int i = 0; i <= ties; i++)
+            {
+                float t = i / (float)ties;
+                var tie = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                tie.name = "Tie";
+                tie.transform.SetParent(_root, false);
+                tie.transform.position = Vector3.Lerp(a, b, t);
+                tie.transform.rotation = rails.transform.rotation;
+                tie.transform.localScale = new Vector3(0.72f, 0.05f, 0.14f);
+                tie.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Tie;
+                Object.Destroy(tie.GetComponent<Collider>());
+            }
+        }
+
+        private void DrawTowns()
+        {
+            foreach (var town in RailroadGraph.Towns)
+            {
+                var pad = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                pad.name = town.Name;
+                pad.transform.SetParent(_root, false);
+                pad.transform.position = WorldPos(town) + Vector3.up * 0.08f;
+                pad.transform.localScale = new Vector3(2.1f, 0.08f, 2.1f);
+                pad.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Town(town.Id);
+                Object.Destroy(pad.GetComponent<Collider>());
+
+                House(WorldPos(town) + new Vector3(-0.55f, 0.45f, -0.35f), RailroadMaterials.Town(town.Id));
+                House(WorldPos(town) + new Vector3(0.45f, 0.38f, -0.55f), RailroadMaterials.TrainDark);
+
+                var hit = new GameObject("Hit " + town.Id);
+                hit.transform.SetParent(_root, false);
+                hit.transform.position = WorldPos(town) + Vector3.up * 0.55f;
+                var sphere = hit.AddComponent<SphereCollider>();
+                sphere.radius = 1.05f;
+                var marker = hit.AddComponent<TownMarker>();
+                marker.TownId = town.Id;
+
+                var label = new GameObject("Label " + town.Name);
+                label.transform.SetParent(_root, false);
+                label.transform.position = WorldPos(town) + Vector3.up * 2.05f;
+                var mesh = label.AddComponent<TextMesh>();
+                mesh.text = town.Name;
+                mesh.fontSize = 48;
+                mesh.characterSize = 0.12f;
+                mesh.anchor = TextAnchor.LowerCenter;
+                mesh.alignment = TextAlignment.Center;
+                mesh.color = Color.white;
+                var labelRenderer = label.GetComponent<MeshRenderer>();
+                if (labelRenderer != null)
+                    labelRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                _labels.Add(label.transform);
+            }
+        }
+
+        private void House(Vector3 position, Material material)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            go.name = "House";
+            go.transform.SetParent(_root, false);
+            go.transform.position = position;
+            go.transform.localScale = new Vector3(0.7f, 0.7f, 0.55f);
+            go.GetComponent<Renderer>().sharedMaterial = material;
+            Object.Destroy(go.GetComponent<Collider>());
+        }
+
+        private void Hill(Vector3 position, Vector3 scale)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            go.name = "Hill";
+            go.transform.SetParent(_root, false);
+            go.transform.position = position;
+            go.transform.localScale = scale;
+            go.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Hill;
+            Object.Destroy(go.GetComponent<Collider>());
+        }
+    }
+}
