@@ -7,7 +7,8 @@ namespace Knightworld.Core
     {
         None = 0,
         Tree = 1,
-        Wall = 2
+        Wall = 2,
+        Water = 3
     }
 
     public sealed class GridCell
@@ -15,6 +16,7 @@ namespace Knightworld.Core
         public bool Walkable { get; set; } = true;
         public bool BlocksSight { get; set; }
         public CellFeature Feature { get; set; }
+        public bool IsFeatureOrigin { get; set; }
         public int Height { get; set; }
         public CoverLevel North { get; set; }
         public CoverLevel East { get; set; }
@@ -78,29 +80,61 @@ namespace Knightworld.Core
             if (!InBounds(pos))
                 return true;
             var cell = this[pos];
-            if (cell.Feature == CellFeature.Tree)
+            if (cell.Feature == CellFeature.Tree || cell.Feature == CellFeature.Water)
                 return false;
             return cell.BlocksSight || !cell.Walkable;
         }
 
         public void PlaceWall(GridPos pos)
         {
-            if (!InBounds(pos))
+            if (!InBounds(pos) || this[pos].Feature == CellFeature.Water)
                 return;
             var cell = this[pos];
             cell.Walkable = false;
             cell.BlocksSight = true;
             cell.Feature = CellFeature.Wall;
+            cell.IsFeatureOrigin = true;
         }
 
-        public void PlaceTree(GridPos pos)
+        public void PlaceWater(GridPos pos)
         {
             if (!InBounds(pos))
                 return;
             var cell = this[pos];
             cell.Walkable = false;
             cell.BlocksSight = false;
-            cell.Feature = CellFeature.Tree;
+            cell.Feature = CellFeature.Water;
+            cell.IsFeatureOrigin = true;
+        }
+
+        public bool PlaceTree(GridPos southWest)
+        {
+            var cells = new[]
+            {
+                southWest,
+                southWest.Offset(1, 0),
+                southWest.Offset(0, 1),
+                southWest.Offset(1, 1)
+            };
+            for (int i = 0; i < cells.Length; i++)
+            {
+                if (!InBounds(cells[i]))
+                    return false;
+                var feature = this[cells[i]].Feature;
+                if (feature != CellFeature.None)
+                    return false;
+            }
+
+            for (int i = 0; i < cells.Length; i++)
+            {
+                var cell = this[cells[i]];
+                cell.Walkable = false;
+                cell.BlocksSight = false;
+                cell.Feature = CellFeature.Tree;
+                cell.IsFeatureOrigin = i == 0;
+            }
+
+            return true;
         }
 
         public int Index(GridPos pos) => pos.Y * Width + pos.X;

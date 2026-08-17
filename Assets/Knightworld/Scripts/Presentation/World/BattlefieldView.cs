@@ -22,22 +22,16 @@ namespace Knightworld.Presentation
                 {
                     var pos = new GridPos(x, y);
                     var cell = map[pos];
-                    var tile = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                    tile.name = $"Tile {pos}";
-                    tile.transform.SetParent(_root, false);
-                    float height = GridWorld.TileHeight;
-                    tile.transform.localScale = new Vector3(GridWorld.CellSize * 0.96f, height, GridWorld.CellSize * 0.96f);
-                    tile.transform.position = GridWorld.CellCenter(pos, height * 0.5f);
-                    var renderer = tile.GetComponent<Renderer>();
-                    renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                    renderer.receiveShadows = false;
-                    renderer.sharedMaterial = ((x + y) & 1) == 0 ? PlaceholderMaterials.GrassA : PlaceholderMaterials.GrassB;
-                    Object.Destroy(tile.GetComponent<Collider>());
+                    if (cell.Feature == CellFeature.Water)
+                        DrawWaterTile(pos, x, y);
+                    else
+                        DrawGrassTile(pos, x, y);
+
                     if (cell.Feature == CellFeature.Wall)
                         DrawWall(pos);
-                    else if (cell.Feature == CellFeature.Tree)
+                    else if (cell.Feature == CellFeature.Tree && cell.IsFeatureOrigin)
                         DrawTree(pos);
-                    else
+                    else if (cell.Feature == CellFeature.None)
                         DrawCoverEdges(map, pos);
                 }
             }
@@ -59,6 +53,30 @@ namespace Knightworld.Presentation
             Object.Destroy(field.GetComponent<Collider>());
         }
 
+        private void DrawGrassTile(GridPos pos, int x, int y)
+        {
+            DrawFloor(pos, GridWorld.TileHeight, ((x + y) & 1) == 0 ? PlaceholderMaterials.GrassA : PlaceholderMaterials.GrassB);
+        }
+
+        private void DrawWaterTile(GridPos pos, int x, int y)
+        {
+            DrawFloor(pos, GridWorld.WaterHeight, ((x + y) & 1) == 0 ? PlaceholderMaterials.WaterA : PlaceholderMaterials.WaterB);
+        }
+
+        private void DrawFloor(GridPos pos, float height, Material material)
+        {
+            var tile = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            tile.name = $"Tile {pos}";
+            tile.transform.SetParent(_root, false);
+            tile.transform.localScale = new Vector3(GridWorld.CellSize * 0.98f, height, GridWorld.CellSize * 0.98f);
+            tile.transform.position = GridWorld.CellCenter(pos, height * 0.5f);
+            var renderer = tile.GetComponent<Renderer>();
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.sharedMaterial = material;
+            Object.Destroy(tile.GetComponent<Collider>());
+        }
+
         private void DrawWall(GridPos pos)
         {
             var stone = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -77,26 +95,26 @@ namespace Knightworld.Presentation
         private void DrawTree(GridPos pos)
         {
             int seed = pos.X * 37 + pos.Y * 17;
-            float lean = ((seed % 7) - 3) * 4f;
-            float canopy = 0.78f + (seed % 5) * 0.04f;
+            float lean = ((seed % 5) - 2) * 3f;
             var root = new GameObject($"Tree {pos}").transform;
             root.SetParent(_root, false);
-            root.position = GridWorld.CellCenter(pos, 0f);
+            Vector3 center = GridWorld.CellCenter(pos, 0f) + new Vector3(GridWorld.CellSize * 0.5f, 0f, GridWorld.CellSize * 0.5f);
+            root.position = center;
             root.rotation = Quaternion.Euler(0f, seed % 360, 0f);
 
             var trunk = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             trunk.name = "Trunk";
             trunk.transform.SetParent(root, false);
-            trunk.transform.localScale = new Vector3(0.2f, 0.42f, 0.2f);
-            trunk.transform.localPosition = new Vector3(0f, GridWorld.TileHeight + 0.42f, 0f);
-            trunk.transform.localRotation = Quaternion.Euler(lean, 0f, lean * 0.3f);
+            trunk.transform.localScale = new Vector3(0.55f, 0.85f, 0.55f);
+            trunk.transform.localPosition = new Vector3(0f, GridWorld.TileHeight + 0.85f, 0f);
+            trunk.transform.localRotation = Quaternion.Euler(lean, 0f, lean * 0.25f);
             StyleProp(trunk, PlaceholderMaterials.Bark);
 
             var leaves = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             leaves.name = "Canopy";
             leaves.transform.SetParent(root, false);
-            leaves.transform.localScale = new Vector3(canopy, canopy * 0.9f, canopy);
-            leaves.transform.localPosition = new Vector3(0f, GridWorld.TileHeight + 1.15f, 0f);
+            leaves.transform.localScale = new Vector3(2.15f, 1.85f, 2.15f);
+            leaves.transform.localPosition = new Vector3(0f, GridWorld.TileHeight + 2.15f, 0f);
             StyleProp(leaves, PlaceholderMaterials.Leaves);
         }
 

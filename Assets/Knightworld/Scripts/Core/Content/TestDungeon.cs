@@ -4,71 +4,57 @@ namespace Knightworld.Core
 {
     public static class TestDungeon
     {
-        public const int Width = 24;
-        public const int Height = 18;
+        public const int Width = LevelMaps.Width;
+        public const int Height = LevelMaps.Height;
 
         public static GridMap CreateMap()
         {
-            var map = new GridMap(Width, Height);
-            for (int x = 0; x < Width; x++)
+            var map = TerrainBrush.Open(Width, Height);
+            for (int y = 0; y <= 6; y++)
             {
-                for (int y = 0; y < Height; y++)
-                    map[x, y].Walkable = true;
+                TerrainBrush.Water(map, 11, y);
+                TerrainBrush.Water(map, 12, y);
             }
 
-            PlaceWallRun(map, new GridPos(9, 7), new GridPos(13, 7));
+            TerrainBrush.Water(map, 13, 6);
+            TerrainBrush.Water(map, 14, 6);
+            TerrainBrush.Water(map, 15, 6);
+            TerrainBrush.Water(map, 15, 7);
+            TerrainBrush.Water(map, 16, 7);
+            TerrainBrush.Water(map, 17, 7);
+            TerrainBrush.Water(map, 16, 8);
+            TerrainBrush.Water(map, 17, 8);
+            TerrainBrush.Water(map, 18, 8);
+            TerrainBrush.Water(map, 16, 9);
+            TerrainBrush.Water(map, 17, 9);
+            TerrainBrush.Water(map, 18, 7);
+
+            TerrainBrush.WallRun(map, new GridPos(9, 7), new GridPos(13, 7));
             map.PlaceWall(new GridPos(13, 8));
             map.PlaceWall(new GridPos(13, 9));
-            PlaceWallRun(map, new GridPos(4, 12), new GridPos(6, 12));
-            PlaceWallRun(map, new GridPos(18, 9), new GridPos(18, 11));
+            TerrainBrush.WallRun(map, new GridPos(4, 12), new GridPos(6, 12));
+            TerrainBrush.WallRun(map, new GridPos(18, 9), new GridPos(18, 11));
 
-            map.PlaceTree(new GridPos(6, 4));
-            map.PlaceTree(new GridPos(7, 8));
-            map.PlaceTree(new GridPos(8, 14));
-            map.PlaceTree(new GridPos(11, 4));
-            map.PlaceTree(new GridPos(11, 11));
-            map.PlaceTree(new GridPos(14, 13));
-            map.PlaceTree(new GridPos(16, 5));
-            map.PlaceTree(new GridPos(20, 7));
-            map.PlaceTree(new GridPos(21, 14));
-            map.PlaceTree(new GridPos(15, 16));
+            map.PlaceTree(new GridPos(1, 1));
+            map.PlaceTree(new GridPos(6, 3));
+            map.PlaceTree(new GridPos(2, 14));
+            map.PlaceTree(new GridPos(14, 12));
+            map.PlaceTree(new GridPos(19, 4));
+            map.PlaceTree(new GridPos(21, 15));
 
-            map.SetCover(new GridPos(6, 5), Cardinal.North, CoverLevel.Half);
-            map.SetCover(new GridPos(6, 5), Cardinal.East, CoverLevel.Half);
+            map.SetCover(new GridPos(6, 6), Cardinal.North, CoverLevel.Half);
+            map.SetCover(new GridPos(6, 6), Cardinal.East, CoverLevel.Half);
             map.SetCover(new GridPos(10, 8), Cardinal.West, CoverLevel.Half);
             map.SetCover(new GridPos(10, 8), Cardinal.South, CoverLevel.Half);
             map.SetCover(new GridPos(12, 10), Cardinal.North, CoverLevel.ThreeQuarter);
             map.SetCover(new GridPos(16, 11), Cardinal.South, CoverLevel.Half);
             map.SetCover(new GridPos(16, 11), Cardinal.West, CoverLevel.Half);
-            map.SetCover(new GridPos(8, 12), Cardinal.East, CoverLevel.Half);
-            map.SetCover(new GridPos(18, 6), Cardinal.North, CoverLevel.Half);
+            map.SetCover(new GridPos(8, 13), Cardinal.East, CoverLevel.Half);
+            map.SetCover(new GridPos(20, 6), Cardinal.North, CoverLevel.Half);
             return map;
         }
 
-        public static List<UnitState> CreateUnits()
-        {
-            return new List<UnitState>
-            {
-                CoreCatalog.Fighter.Instantiate(1, "Aldric", Team.Player, new GridPos(3, 3)),
-                CoreCatalog.Wizard.Instantiate(2, "Seraphine", Team.Player, new GridPos(4, 3)),
-                CoreCatalog.Goblin.Instantiate(3, "Goblin Scout", Team.Enemy, new GridPos(19, 13)),
-                CoreCatalog.Goblin.Instantiate(4, "Goblin Cutthroat", Team.Enemy, new GridPos(20, 12)),
-                CoreCatalog.Goblin.Instantiate(5, "Goblin Archer", Team.Enemy, new GridPos(17, 14))
-            };
-        }
-
-        private static void PlaceWallRun(GridMap map, GridPos from, GridPos to)
-        {
-            int dx = to.X == from.X ? 0 : (to.X > from.X ? 1 : -1);
-            int dy = to.Y == from.Y ? 0 : (to.Y > from.Y ? 1 : -1);
-            var pos = from;
-            while (true)
-            {
-                map.PlaceWall(pos);
-                if (pos == to)
-                    return;
-                pos = pos.Offset(dx, dy);
-            }
-        }
+        public static List<UnitState> CreateUnits() =>
+            LevelMaps.StandardFight(new GridPos(3, 3), new GridPos(4, 3), new GridPos(19, 13), new GridPos(20, 12), new GridPos(17, 14));
     }
 }

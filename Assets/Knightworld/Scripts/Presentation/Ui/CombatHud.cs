@@ -88,16 +88,22 @@ namespace Knightworld.Presentation
             Stretch(panelRect);
             var image = _outcomePanel.AddComponent<Image>();
             image.color = new Color(0f, 0f, 0f, 0.55f);
-            _outcome = CreateTextOn(_outcomePanel.transform, "Outcome", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 40), 42, TextAnchor.MiddleCenter, new Vector2(800, 120));
-            CreateButtonOn(_outcomePanel.transform, "Restart", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -50), new Vector2(220, 56), () =>
+            _outcome = CreateTextOn(_outcomePanel.transform, "Outcome", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 56), 42, TextAnchor.MiddleCenter, new Vector2(800, 120));
+            CreateButtonOn(_outcomePanel.transform, "Retry", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-130, -50), new Vector2(220, 56), () =>
             {
-                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                SceneManager.LoadScene(OverworldController.BattleScene);
+            });
+            CreateButtonOn(_outcomePanel.transform, "World Map", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(130, -50), new Vector2(220, 56), () =>
+            {
+                SceneManager.LoadScene(OverworldController.SceneName);
             });
             _outcomePanel.SetActive(false);
         }
 
         private void ShowOutcome(CombatOutcome outcome)
         {
+            if (outcome == CombatOutcome.PlayerVictory)
+                CampaignState.RecordVictory();
             _outcomePanel.SetActive(true);
             _outcome.text = outcome == CombatOutcome.PlayerVictory ? "Victory" : "Defeat";
             Refresh();

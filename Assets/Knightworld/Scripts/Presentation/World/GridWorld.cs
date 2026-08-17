@@ -7,6 +7,7 @@ namespace Knightworld.Presentation
     {
         public const float CellSize = 1f;
         public const float TileHeight = 0.25f;
+        public const float WaterHeight = 0.12f;
         public const float FieldY = -0.4f;
         public const float HighlightY = 0.28f;
         public const float UnitY = 1.15f;

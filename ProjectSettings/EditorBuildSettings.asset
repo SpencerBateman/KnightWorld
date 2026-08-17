@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Knightworld/Scenes/Overworld.unity
+    guid: b5c6d7e89f0a1b2c3d4e5f6a7b8c9d01
+  - enabled: 1
     path: Assets/Knightworld/Scenes/Battle.unity
     guid: 4b7c0d1e5f6a7b8c9d0e1f2a3b4c5063
   - enabled: 0

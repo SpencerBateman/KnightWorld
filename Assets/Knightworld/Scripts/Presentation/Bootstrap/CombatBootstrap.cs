@@ -14,9 +14,11 @@ namespace Knightworld.Bootstrap
         private void Start()
         {
             PlaceholderMaterials.Ensure();
-            var map = TestDungeon.CreateMap();
-            var units = CreateUnits();
-            var session = new CombatSession(map, units, new SeededRandom(randomSeed));
+            var spec = LevelCatalog.Get(CampaignState.PendingLevelId);
+            int seed = string.IsNullOrEmpty(CampaignState.PendingLevelId) ? randomSeed : spec.Seed;
+            var map = spec.CreateMap();
+            var units = CreateUnits(spec);
+            var session = new CombatSession(map, units, new SeededRandom(seed));
 
             var world = new GameObject("Battlefield").transform;
             new BattlefieldView(world).Build(map);
@@ -58,10 +60,12 @@ namespace Knightworld.Bootstrap
             session.Start();
         }
 
-        private List<UnitState> CreateUnits()
+        private List<UnitState> CreateUnits(LevelSpec spec)
         {
+            if (!string.IsNullOrEmpty(CampaignState.PendingLevelId))
+                return spec.CreateUnits();
             if (encounter == null)
-                return TestDungeon.CreateUnits();
+                return spec.CreateUnits();
             return new List<UnitState>
             {
                 encounter.CreateFighter(1, "Aldric", new GridPos(3, 3)),
