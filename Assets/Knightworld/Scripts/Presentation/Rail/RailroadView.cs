@@ -18,6 +18,7 @@ namespace Knightworld.Presentation
         private Transform _seatRoot;
         private Transform _car;
         private RailroadScenery _scenery;
+        private readonly Dictionary<string, DestPin> _destPins = new Dictionary<string, DestPin>();
 
         public RailroadView(Transform root)
         {
@@ -124,6 +125,8 @@ namespace Knightworld.Presentation
                 else
                     _seats[i].sharedMaterial = RailroadMaterials.SeatEmpty;
             }
+
+            RefreshDestPins(session);
         }
 
         private Transform SpawnPerson(Passenger person)
@@ -305,7 +308,76 @@ namespace Knightworld.Presentation
                 if (labelRenderer != null)
                     labelRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 _labels.Add(label.transform);
+                SpawnDestPin(town);
             }
+        }
+
+        private void SpawnDestPin(TownDef town)
+        {
+            var root = new GameObject("DestPin " + town.Id);
+            root.transform.SetParent(_root, false);
+            root.transform.position = WorldPos(town) + Vector3.up * 3.35f;
+
+            var floater = new GameObject("Float");
+            floater.transform.SetParent(root.transform, false);
+            var bob = floater.AddComponent<DestBeacon>();
+            bob.Phase = town.Id.Length * 0.7f;
+
+            var face = new GameObject("Face");
+            face.transform.SetParent(floater.transform, false);
+            _labels.Add(face.transform);
+
+            var gem = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            gem.name = "Gem";
+            gem.transform.SetParent(face.transform, false);
+            gem.transform.localPosition = Vector3.zero;
+            gem.transform.localScale = new Vector3(0.52f, 0.34f, 0.52f);
+            gem.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Town(town.Id);
+            Object.Destroy(gem.GetComponent<Collider>());
+
+            var count = new GameObject("Count");
+            count.transform.SetParent(face.transform, false);
+            count.transform.localPosition = new Vector3(0f, 0.02f, -0.02f);
+            var mesh = count.AddComponent<TextMesh>();
+            mesh.text = "1";
+            mesh.fontSize = 64;
+            mesh.characterSize = 0.06f;
+            mesh.anchor = TextAnchor.MiddleCenter;
+            mesh.alignment = TextAlignment.Center;
+            mesh.color = Color.white;
+            var countRenderer = count.GetComponent<MeshRenderer>();
+            if (countRenderer != null)
+                countRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+
+            root.SetActive(false);
+            _destPins[town.Id] = new DestPin
+            {
+                Root = root,
+                Count = mesh,
+                Gem = gem.GetComponent<Renderer>()
+            };
+        }
+
+        private void RefreshDestPins(RailSession session)
+        {
+            foreach (var town in RailroadGraph.Towns)
+            {
+                if (!_destPins.TryGetValue(town.Id, out var pin))
+                    continue;
+                int count = session.CountOnboardTo(town.Id);
+                pin.Root.SetActive(count > 0);
+                if (count <= 0)
+                    continue;
+                pin.Count.text = count.ToString();
+                pin.Gem.sharedMaterial = RailroadMaterials.Town(town.Id);
+            }
+        }
+
+        private struct DestPin
+        {
+            public GameObject Root;
+            public TextMesh Count;
+            public Renderer Gem;
         }
 
         private void House(Vector3 position, Material material)

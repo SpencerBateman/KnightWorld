@@ -53,6 +53,15 @@ namespace Knightworld.Tests
         }
 
         [Test]
+        public void TrainCanOnlyUseDirectTracks()
+        {
+            Assert.IsTrue(RailroadGraph.AreLinked(RailroadGraph.Millhaven, RailroadGraph.Portmere));
+            Assert.IsTrue(RailroadGraph.AreLinked(RailroadGraph.Portmere, RailroadGraph.Millhaven));
+            Assert.IsFalse(RailroadGraph.AreLinked(RailroadGraph.Millhaven, RailroadGraph.Emberford));
+            Assert.IsFalse(RailroadGraph.AreLinked(RailroadGraph.Millhaven, RailroadGraph.Millhaven));
+        }
+
+        [Test]
         public void TrainStartsWithOneEmptySeat()
         {
             var session = NewSession();

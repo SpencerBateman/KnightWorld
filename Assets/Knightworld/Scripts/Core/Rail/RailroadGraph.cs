@@ -42,6 +42,8 @@ namespace Knightworld.Core
 
         public static TownDef Get(string id) => Map.Get(id);
 
+        public static bool AreLinked(string fromId, string toId) => Map.AreLinked(fromId, toId);
+
         public static float Distance(string fromId, string toId) => Map.Distance(fromId, toId);
 
         public static float RouteDistance(IReadOnlyList<string> route) => Map.RouteDistance(route);

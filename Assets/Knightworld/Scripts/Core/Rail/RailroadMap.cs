@@ -82,6 +82,21 @@ namespace Knightworld.Core
             return Towns[0];
         }
 
+        public bool AreLinked(string fromId, string toId)
+        {
+            if (fromId == null || toId == null || fromId == toId)
+                return false;
+            if (!_byId.TryGetValue(fromId, out var town))
+                return false;
+            for (int i = 0; i < town.Links.Count; i++)
+            {
+                if (town.Links[i] == toId)
+                    return true;
+            }
+
+            return false;
+        }
+
         public float Euclidean(string fromId, string toId)
         {
             var from = Get(fromId);

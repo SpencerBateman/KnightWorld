@@ -209,7 +209,7 @@ namespace Knightworld.Presentation
         {
             _shop.Close();
             _station.Close();
-            _banner = "Choose a town to ride to.";
+            _banner = "Choose a connected station to ride to.";
             _hud.Refresh(_session, _banner);
         }
 
@@ -230,8 +230,10 @@ namespace Knightworld.Presentation
             var town = RailroadGraph.Get(townId);
             if (town.Id == _session.CurrentTownId)
                 _hud.SetTooltip($"Click to open the {town.Name} platform.");
+            else if (!RailroadGraph.AreLinked(_session.CurrentTownId, town.Id))
+                _hud.SetTooltip($"{town.Name} is not on a connecting track.");
             else
-                _hud.SetTooltip($"Ride the rails to {town.Name}. {TravelLabel(town.Id)}");
+                _hud.SetTooltip($"Ride to {town.Name}. {TravelLabel(town.Id)}");
         }
 
         private void HandleClick()
@@ -250,20 +252,24 @@ namespace Knightworld.Presentation
                 return;
             }
 
-            var route = RailroadGraph.FindRoute(_session.CurrentTownId, townId);
-            if (route == null || route.Count < 2)
+            if (!RailroadGraph.AreLinked(_session.CurrentTownId, townId))
+            {
+                var blocked = RailroadGraph.Get(townId);
+                _banner = $"You can only ride to a connected station. {blocked.Name} is not next to here.";
+                _hud.Refresh(_session, _banner);
                 return;
-            StartCoroutine(Ride(route));
+            }
+
+            StartCoroutine(Ride(_session.CurrentTownId, townId));
         }
 
-        private IEnumerator Ride(System.Collections.Generic.List<string> route)
+        private IEnumerator Ride(string fromId, string toId)
         {
             _busy = true;
             _hud.SetTooltip("");
-            for (int i = 1; i < route.Count; i++)
-                yield return Hop(route[i - 1], route[i]);
+            yield return Hop(fromId, toId);
 
-            _session.Arrive(route[route.Count - 1]);
+            _session.Arrive(toId);
             _view.SnapTrain(_session.CurrentTownId);
             _view.RefreshPassengers(_session);
             var town = RailroadGraph.Get(_session.CurrentTownId);
@@ -343,8 +349,7 @@ namespace Knightworld.Presentation
 
         private string TravelLabel(string townId)
         {
-            var route = RailroadGraph.FindRoute(_session.CurrentTownId, townId);
-            int seconds = Mathf.Max(1, Mathf.RoundToInt(RailroadGraph.RouteTravelSeconds(route)));
+            int seconds = Mathf.Max(1, Mathf.RoundToInt(RailroadGraph.TravelSeconds(RailroadGraph.Distance(_session.CurrentTownId, townId))));
             return seconds == 1 ? "1 second" : seconds + " seconds";
         }
     }

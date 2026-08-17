@@ -66,7 +66,7 @@ namespace Knightworld.Presentation
             _cargo = CreateText("Cargo", new Vector2(0f, 0f), new Vector2(28, 28), 20, TextAnchor.LowerLeft, new Vector2(520, 400));
             _tooltip = CreateText("Tooltip", new Vector2(0.5f, 0f), new Vector2(0, 28), 22, TextAnchor.LowerCenter, new Vector2(1100, 80));
             var hint = CreateText("Hint", new Vector2(1f, 0f), new Vector2(-28, 28), 18, TextAnchor.LowerRight, new Vector2(520, 90));
-            hint.text = "Click a town to ride.\nOpen the shop for extra seats and a carriage.";
+            hint.text = "Ride only to a connected station.\nA floating count marks passenger destinations.";
             _title.text = RailroadGraph.Map.Title;
         }
 
