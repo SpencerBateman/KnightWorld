@@ -13,6 +13,8 @@ namespace Knightworld.Presentation
         private Text _cargo;
         private Text _tooltip;
 
+        public RailroadStationScreen Station { get; private set; }
+
         public static RailroadHud Create()
         {
             if (EventSystem.current == null)
@@ -22,7 +24,7 @@ namespace Knightworld.Presentation
                 go.AddComponent<InputSystemUIInputModule>();
             }
 
-            var canvasGo = new GameObject("RailroadHud");
+            var canvasGo = new GameObject("RailroadHud", typeof(RectTransform));
             var canvas = canvasGo.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 100;
@@ -32,6 +34,7 @@ namespace Knightworld.Presentation
             canvasGo.AddComponent<GraphicRaycaster>();
             var hud = canvasGo.AddComponent<RailroadHud>();
             hud.Build();
+            hud.Station = RailroadStationScreen.Create(canvasGo.transform);
             return hud;
         }
 
@@ -46,48 +49,30 @@ namespace Knightworld.Presentation
             if (session == null)
                 return;
             var town = RailroadGraph.Get(session.CurrentTownId);
-            _title.text = "Five Towns";
-            _status.text = $"{town.Name}    Score {session.Score}    Seats {session.Onboard.Count}/{RailSession.SeatCount}";
+            _title.text = "The Local";
+            _status.text = $"{town.Name}    Score {session.Score}    Seats {session.Onboard.Count}/{session.SeatCount}";
             if (!string.IsNullOrEmpty(banner))
                 _status.text += "\n" + banner;
 
-            if (session.Onboard.Count == 0)
-            {
-                _cargo.text = "Train is empty. Click a waiting passenger to board.";
-                return;
-            }
-
-            var lines = new System.Text.StringBuilder();
-            lines.Append("On board:\n");
-            for (int i = 0; i < session.Onboard.Count; i++)
-            {
-                var person = session.Onboard[i];
-                lines.Append(person.Name);
-                lines.Append(" → ");
-                lines.Append(RailroadGraph.Get(person.DestId).Name);
-                if (i < session.Onboard.Count - 1)
-                    lines.Append("   ");
-            }
-
-            _cargo.text = lines.ToString();
+            _cargo.text = FormatDestinations(session);
         }
 
         private void Build()
         {
             _title = CreateText("Title", new Vector2(0.5f, 1f), new Vector2(0, -24), 36, TextAnchor.UpperCenter, new Vector2(900, 60));
             _status = CreateText("Status", new Vector2(0.5f, 1f), new Vector2(0, -72), 22, TextAnchor.UpperCenter, new Vector2(1400, 90));
-            _cargo = CreateText("Cargo", new Vector2(0f, 0f), new Vector2(28, 28), 20, TextAnchor.LowerLeft, new Vector2(860, 220));
+            _cargo = CreateText("Cargo", new Vector2(0f, 0f), new Vector2(28, 28), 20, TextAnchor.LowerLeft, new Vector2(520, 400));
             _tooltip = CreateText("Tooltip", new Vector2(0.5f, 0f), new Vector2(0, 28), 22, TextAnchor.LowerCenter, new Vector2(1100, 80));
             var hint = CreateText("Hint", new Vector2(1f, 0f), new Vector2(-28, 28), 18, TextAnchor.LowerRight, new Vector2(520, 90));
-            hint.text = "Click a town to ride.\nClick a person to board.\nColors match destinations.";
-            _title.text = "Five Towns";
+            hint.text = "Click a town to ride.\nStations have a store. +2 seats cost 50.";
+            _title.text = "The Local";
         }
 
         private Text CreateText(string name, Vector2 anchor, Vector2 anchored, int size, TextAnchor align, Vector2 sizeDelta)
         {
-            var go = new GameObject(name);
-            go.transform.SetParent(transform, false);
-            var rect = go.AddComponent<RectTransform>();
+            var go = new GameObject(name, typeof(RectTransform));
+            var rect = go.GetComponent<RectTransform>();
+            rect.SetParent(transform, false);
             rect.anchorMin = anchor;
             rect.anchorMax = anchor;
             rect.pivot = anchor;
@@ -104,7 +89,36 @@ namespace Knightworld.Presentation
             var outline = go.AddComponent<Outline>();
             outline.effectColor = Color.black;
             outline.effectDistance = new Vector2(1f, -1f);
+            text.supportRichText = true;
             return text;
+        }
+
+        public static string FormatDestinations(RailSession session)
+        {
+            RailroadMaterials.Ensure();
+            var lines = new System.Text.StringBuilder();
+            lines.Append("Passenger destinations:");
+            var tallies = session.DestinationTallies();
+            if (tallies.Count == 0)
+            {
+                lines.Append("\n<color=#AAAAAA>none</color>");
+                return lines.ToString();
+            }
+
+            for (int i = 0; i < tallies.Count; i++)
+            {
+                var tally = tallies[i];
+                string hex = ColorUtility.ToHtmlStringRGB(Color.Lerp(RailroadMaterials.TownColor(tally.TownId), Color.white, 0.22f));
+                lines.Append("\n<color=#");
+                lines.Append(hex);
+                lines.Append('>');
+                lines.Append(tally.TownName);
+                lines.Append(": ");
+                lines.Append(tally.Count);
+                lines.Append("</color>");
+            }
+
+            return lines.ToString();
         }
     }
 }

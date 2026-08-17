@@ -32,9 +32,9 @@ namespace Knightworld.Bootstrap
             var iso = camera.GetComponent<IsoCameraController>();
             if (iso == null)
                 iso = camera.gameObject.AddComponent<IsoCameraController>();
-            iso.Distance = 22f;
-            iso.MinDistance = 12f;
-            iso.MaxDistance = 36f;
+            iso.Distance = 28f;
+            iso.MinDistance = 14f;
+            iso.MaxDistance = 48f;
             iso.Pitch = 52f;
             iso.FocusImmediate(view.Center);
 

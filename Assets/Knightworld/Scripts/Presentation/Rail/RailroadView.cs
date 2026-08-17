@@ -15,6 +15,8 @@ namespace Knightworld.Presentation
         private readonly List<Transform> _labels = new List<Transform>();
         private Transform _train;
         private Transform _passengerRoot;
+        private Transform _seatRoot;
+        private Transform _car;
 
         public RailroadView(Transform root)
         {
@@ -97,6 +99,7 @@ namespace Knightworld.Presentation
             for (int i = 0; i < remove.Count; i++)
                 _waiting.Remove(remove[i]);
 
+            SyncSeats(session.SeatCount);
             for (int i = 0; i < _seats.Count; i++)
             {
                 if (i < session.Onboard.Count)
@@ -157,26 +160,40 @@ namespace Knightworld.Presentation
             var car = GameObject.CreatePrimitive(PrimitiveType.Cube);
             car.name = "Car";
             car.transform.SetParent(root, false);
-            car.transform.localPosition = new Vector3(0f, 0.32f, -0.85f);
-            car.transform.localScale = new Vector3(0.72f, 0.38f, 1.5f);
-            car.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Train;
+            _car = car.transform;
             Object.Destroy(car.GetComponent<Collider>());
-
-            for (int i = 0; i < RailSession.SeatCount; i++)
-            {
-                int row = i / 5;
-                int col = i % 5;
-                var seat = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                seat.name = "Seat " + i;
-                seat.transform.SetParent(root, false);
-                seat.transform.localPosition = new Vector3(-0.22f + col * 0.11f, 0.58f, -0.35f - row * 0.42f);
-                seat.transform.localScale = new Vector3(0.1f, 0.12f, 0.16f);
-                seat.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.SeatEmpty;
-                Object.Destroy(seat.GetComponent<Collider>());
-                _seats.Add(seat.GetComponent<Renderer>());
-            }
-
+            _seatRoot = root;
+            SyncSeats(RailSession.StartingSeats);
             return root;
+        }
+
+        public void SyncSeats(int seatCount)
+        {
+            if (_seatRoot == null)
+                return;
+            while (_seats.Count < seatCount)
+                AddSeatVisual(_seats.Count);
+            if (_car != null)
+            {
+                float length = 0.6f + seatCount * 0.28f;
+                _car.localScale = new Vector3(0.72f, 0.38f, length);
+                _car.localPosition = new Vector3(0f, 0.32f, -0.25f - length * 0.35f);
+                _car.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Train;
+            }
+        }
+
+        private void AddSeatVisual(int index)
+        {
+            int row = index / 4;
+            int col = index % 4;
+            var seat = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            seat.name = "Seat " + index;
+            seat.transform.SetParent(_seatRoot, false);
+            seat.transform.localPosition = new Vector3(-0.22f + col * 0.14f, 0.58f, -0.4f - row * 0.38f);
+            seat.transform.localScale = new Vector3(0.12f, 0.12f, 0.16f);
+            seat.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.SeatEmpty;
+            Object.Destroy(seat.GetComponent<Collider>());
+            _seats.Add(seat.GetComponent<Renderer>());
         }
 
         private void DrawGround()
@@ -184,14 +201,15 @@ namespace Knightworld.Presentation
             var field = GameObject.CreatePrimitive(PrimitiveType.Plane);
             field.name = "Ground";
             field.transform.SetParent(_root, false);
-            field.transform.position = new Vector3(0.5f, 0f, 2f);
-            field.transform.localScale = new Vector3(4.6f, 1f, 4.4f);
+            field.transform.position = new Vector3(0.5f, 0f, 4f);
+            field.transform.localScale = new Vector3(7.2f, 1f, 7.0f);
             field.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Grass;
             Object.Destroy(field.GetComponent<Collider>());
 
-            Hill(new Vector3(-11f, -0.4f, -6f), new Vector3(6f, 1.8f, 4.5f));
-            Hill(new Vector3(12f, -0.5f, 8f), new Vector3(5.5f, 2.1f, 5f));
-            Hill(new Vector3(-10f, -0.35f, 11f), new Vector3(4.5f, 1.6f, 4f));
+            Hill(new Vector3(-18f, -0.4f, -8f), new Vector3(7f, 2.0f, 5f));
+            Hill(new Vector3(18f, -0.5f, 10f), new Vector3(6f, 2.2f, 5.5f));
+            Hill(new Vector3(-16f, -0.35f, 16f), new Vector3(5.5f, 1.8f, 5f));
+            Hill(new Vector3(8f, -0.6f, 20f), new Vector3(6.5f, 2.4f, 5f));
 
             var pond = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             pond.name = "Lake";
@@ -200,6 +218,14 @@ namespace Knightworld.Presentation
             pond.transform.localScale = new Vector3(4.2f, 0.04f, 2.6f);
             pond.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Water;
             Object.Destroy(pond.GetComponent<Collider>());
+
+            var marsh = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            marsh.name = "Marsh";
+            marsh.transform.SetParent(_root, false);
+            marsh.transform.position = WorldPos(RailroadGraph.Get(RailroadGraph.Saltmarsh)) + new Vector3(2.4f, 0.02f, -1.8f);
+            marsh.transform.localScale = new Vector3(3.4f, 0.04f, 2.2f);
+            marsh.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Water;
+            Object.Destroy(marsh.GetComponent<Collider>());
         }
 
         private void DrawRails()
@@ -261,6 +287,7 @@ namespace Knightworld.Presentation
 
                 House(WorldPos(town) + new Vector3(-0.55f, 0.45f, -0.35f), RailroadMaterials.Town(town.Id));
                 House(WorldPos(town) + new Vector3(0.45f, 0.38f, -0.55f), RailroadMaterials.TrainDark);
+                Store(WorldPos(town) + new Vector3(1.15f, 0.42f, 0.55f), RailroadMaterials.Town(town.Id));
 
                 var hit = new GameObject("Hit " + town.Id);
                 hit.transform.SetParent(_root, false);
@@ -296,6 +323,33 @@ namespace Knightworld.Presentation
             go.transform.localScale = new Vector3(0.7f, 0.7f, 0.55f);
             go.GetComponent<Renderer>().sharedMaterial = material;
             Object.Destroy(go.GetComponent<Collider>());
+        }
+
+        private void Store(Vector3 position, Material awning)
+        {
+            var stall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            stall.name = "Store";
+            stall.transform.SetParent(_root, false);
+            stall.transform.position = position;
+            stall.transform.localScale = new Vector3(0.85f, 0.55f, 0.7f);
+            stall.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Shop;
+            Object.Destroy(stall.GetComponent<Collider>());
+
+            var roof = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            roof.name = "Awning";
+            roof.transform.SetParent(_root, false);
+            roof.transform.position = position + new Vector3(0f, 0.42f, 0.12f);
+            roof.transform.localScale = new Vector3(1.05f, 0.08f, 0.95f);
+            roof.GetComponent<Renderer>().sharedMaterial = awning;
+            Object.Destroy(roof.GetComponent<Collider>());
+
+            var crate = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            crate.name = "Crate";
+            crate.transform.SetParent(_root, false);
+            crate.transform.position = position + new Vector3(0.55f, -0.12f, 0.15f);
+            crate.transform.localScale = new Vector3(0.28f, 0.28f, 0.28f);
+            crate.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Tie;
+            Object.Destroy(crate.GetComponent<Collider>());
         }
 
         private void Hill(Vector3 position, Vector3 scale)

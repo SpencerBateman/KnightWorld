@@ -12,11 +12,17 @@ namespace Knightworld.Presentation
         public static Material Train { get; private set; }
         public static Material TrainDark { get; private set; }
         public static Material SeatEmpty { get; private set; }
+        public static Material Shop { get; private set; }
         public static Material Millhaven { get; private set; }
         public static Material Lakeside { get; private set; }
         public static Material Hillcrest { get; private set; }
         public static Material Emberford { get; private set; }
         public static Material Portmere { get; private set; }
+        public static Material Willowgate { get; private set; }
+        public static Material Saltmarsh { get; private set; }
+        public static Material Copsewood { get; private set; }
+        public static Material Northspire { get; private set; }
+        public static Material Stonebridge { get; private set; }
 
         public static void Ensure()
         {
@@ -30,11 +36,17 @@ namespace Knightworld.Presentation
             Train = Make(new Color(0.78f, 0.18f, 0.16f));
             TrainDark = Make(new Color(0.18f, 0.18f, 0.20f));
             SeatEmpty = Make(new Color(0.42f, 0.42f, 0.44f));
+            Shop = Make(new Color(0.52f, 0.34f, 0.18f));
             Millhaven = Make(new Color(0.82f, 0.70f, 0.28f));
             Lakeside = Make(new Color(0.25f, 0.52f, 0.82f));
             Hillcrest = Make(new Color(0.32f, 0.68f, 0.38f));
             Emberford = Make(new Color(0.78f, 0.32f, 0.18f));
             Portmere = Make(new Color(0.28f, 0.70f, 0.68f));
+            Willowgate = Make(new Color(0.62f, 0.38f, 0.78f));
+            Saltmarsh = Make(new Color(0.78f, 0.68f, 0.38f));
+            Copsewood = Make(new Color(0.22f, 0.48f, 0.24f));
+            Northspire = Make(new Color(0.72f, 0.82f, 0.90f));
+            Stonebridge = Make(new Color(0.58f, 0.56f, 0.52f));
         }
 
         public static Material Town(string townId)
@@ -46,8 +58,21 @@ namespace Knightworld.Presentation
                 case Knightworld.Core.RailroadGraph.Hillcrest: return Hillcrest;
                 case Knightworld.Core.RailroadGraph.Emberford: return Emberford;
                 case Knightworld.Core.RailroadGraph.Portmere: return Portmere;
+                case Knightworld.Core.RailroadGraph.Willowgate: return Willowgate;
+                case Knightworld.Core.RailroadGraph.Saltmarsh: return Saltmarsh;
+                case Knightworld.Core.RailroadGraph.Copsewood: return Copsewood;
+                case Knightworld.Core.RailroadGraph.Northspire: return Northspire;
+                case Knightworld.Core.RailroadGraph.Stonebridge: return Stonebridge;
                 default: return Millhaven;
             }
+        }
+
+        public static Color TownColor(string townId)
+        {
+            var material = Town(townId);
+            if (material.HasProperty("_BaseColor"))
+                return material.GetColor("_BaseColor");
+            return material.color;
         }
 
         private static Material Make(Color color)
