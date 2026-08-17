@@ -13,6 +13,8 @@ namespace Knightworld.Presentation
         public static Material TrainDark { get; private set; }
         public static Material SeatEmpty { get; private set; }
         public static Material Shop { get; private set; }
+        private static readonly System.Collections.Generic.Dictionary<string, Material> ExtraTowns =
+            new System.Collections.Generic.Dictionary<string, Material>();
         public static Material Millhaven { get; private set; }
         public static Material Lakeside { get; private set; }
         public static Material Hillcrest { get; private set; }
@@ -54,6 +56,7 @@ namespace Knightworld.Presentation
             Ensure();
             switch (townId)
             {
+                case Knightworld.Core.RailroadGraph.Millhaven: return Millhaven;
                 case Knightworld.Core.RailroadGraph.Lakeside: return Lakeside;
                 case Knightworld.Core.RailroadGraph.Hillcrest: return Hillcrest;
                 case Knightworld.Core.RailroadGraph.Emberford: return Emberford;
@@ -63,7 +66,7 @@ namespace Knightworld.Presentation
                 case Knightworld.Core.RailroadGraph.Copsewood: return Copsewood;
                 case Knightworld.Core.RailroadGraph.Northspire: return Northspire;
                 case Knightworld.Core.RailroadGraph.Stonebridge: return Stonebridge;
-                default: return Millhaven;
+                default: return ExtraTown(townId);
             }
         }
 
@@ -73,6 +76,18 @@ namespace Knightworld.Presentation
             if (material.HasProperty("_BaseColor"))
                 return material.GetColor("_BaseColor");
             return material.color;
+        }
+
+        private static Material ExtraTown(string townId)
+        {
+            if (string.IsNullOrEmpty(townId))
+                return Millhaven;
+            if (ExtraTowns.TryGetValue(townId, out var material))
+                return material;
+            float hue = ((townId.GetHashCode() & int.MaxValue) % 360) / 360f;
+            material = Make(Color.HSVToRGB(hue, 0.55f, 0.82f));
+            ExtraTowns[townId] = material;
+            return material;
         }
 
         private static Material Make(Color color)

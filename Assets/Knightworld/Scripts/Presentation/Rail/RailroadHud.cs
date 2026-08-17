@@ -49,7 +49,7 @@ namespace Knightworld.Presentation
             if (session == null)
                 return;
             var town = RailroadGraph.Get(session.CurrentTownId);
-            _title.text = "The Local";
+            _title.text = RailroadGraph.Map.Title;
             _status.text = $"{town.Name}    Score {session.Score}    Seats {session.Onboard.Count}/{session.SeatCount}";
             if (!string.IsNullOrEmpty(banner))
                 _status.text += "\n" + banner;
@@ -65,7 +65,7 @@ namespace Knightworld.Presentation
             _tooltip = CreateText("Tooltip", new Vector2(0.5f, 0f), new Vector2(0, 28), 22, TextAnchor.LowerCenter, new Vector2(1100, 80));
             var hint = CreateText("Hint", new Vector2(1f, 0f), new Vector2(-28, 28), 18, TextAnchor.LowerRight, new Vector2(520, 90));
             hint.text = "Click a town to ride.\nStations have a store. +2 seats cost 50.";
-            _title.text = "The Local";
+            _title.text = RailroadGraph.Map.Title;
         }
 
         private Text CreateText(string name, Vector2 anchor, Vector2 anchored, int size, TextAnchor align, Vector2 sizeDelta)

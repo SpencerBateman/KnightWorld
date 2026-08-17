@@ -6,13 +6,15 @@ namespace Knightworld.Bootstrap
 {
     public sealed class RailroadBootstrap : MonoBehaviour
     {
+        public TextAsset mapFile;
         public int randomSeed = 11;
         public int startingPassengersPerTown = 2;
 
         private void Start()
         {
+            LoadMap();
             RailroadMaterials.Ensure();
-            var session = new RailSession(new SeededRandom(randomSeed), RailroadGraph.Millhaven);
+            var session = new RailSession(new SeededRandom(randomSeed), RailroadGraph.StartTownId);
             session.SeedWaiting(startingPassengersPerTown);
 
             var root = new GameObject("Railroad").transform;
@@ -32,15 +34,35 @@ namespace Knightworld.Bootstrap
             var iso = camera.GetComponent<IsoCameraController>();
             if (iso == null)
                 iso = camera.gameObject.AddComponent<IsoCameraController>();
-            iso.Distance = 28f;
+            iso.Distance = Mathf.Clamp(view.Radius * 1.55f + 10f, 16f, 64f);
             iso.MinDistance = 14f;
-            iso.MaxDistance = 48f;
+            iso.MaxDistance = iso.Distance + 28f;
             iso.Pitch = 52f;
             iso.FocusImmediate(view.Center);
 
             var hud = RailroadHud.Create();
             var controller = gameObject.AddComponent<RailroadController>();
             controller.Initialize(session, view, hud, camera);
+        }
+
+        private void LoadMap()
+        {
+            var asset = mapFile != null ? mapFile : Resources.Load<TextAsset>("Maps/the-local");
+            if (asset == null || string.IsNullOrWhiteSpace(asset.text))
+            {
+                RailroadGraph.UseDefault();
+                return;
+            }
+
+            try
+            {
+                RailroadGraph.Use(RailroadMapParser.Parse(asset.text));
+            }
+            catch (RailroadMapException ex)
+            {
+                Debug.LogError("Railroad map failed to load: " + ex.Message);
+                RailroadGraph.UseDefault();
+            }
         }
     }
 }

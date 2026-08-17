@@ -5,6 +5,12 @@ namespace Knightworld.Tests
 {
     public sealed class RailroadTests
     {
+        [SetUp]
+        public void RestoreDefaultMap()
+        {
+            RailroadGraph.UseDefault();
+        }
+
         [Test]
         public void AllTownsAreConnected()
         {

@@ -24,6 +24,7 @@ namespace Knightworld.Presentation
         }
 
         public Vector3 Center { get; private set; }
+        public float Radius { get; private set; }
         public Transform Train => _train;
 
         public void Build()
@@ -35,11 +36,19 @@ namespace Knightworld.Presentation
             _passengerRoot = new GameObject("Passengers").transform;
             _passengerRoot.SetParent(_root, false);
             _train = SpawnTrain();
-            SnapTrain(RailroadGraph.Millhaven);
+            SnapTrain(RailroadGraph.StartTownId);
             Vector3 sum = Vector3.zero;
             foreach (var town in RailroadGraph.Towns)
                 sum += WorldPos(town);
             Center = sum / RailroadGraph.Towns.Count;
+            float radius = 0f;
+            foreach (var town in RailroadGraph.Towns)
+            {
+                float d = Vector3.Distance(WorldPos(town), Center);
+                if (d > radius)
+                    radius = d;
+            }
+            Radius = radius;
         }
 
         public Vector3 WorldPos(TownDef town) => new Vector3(town.X * WorldScale, 0f, town.Z * WorldScale);
@@ -198,34 +207,50 @@ namespace Knightworld.Presentation
 
         private void DrawGround()
         {
+            Vector3 min = new Vector3(float.MaxValue, 0f, float.MaxValue);
+            Vector3 max = new Vector3(float.MinValue, 0f, float.MinValue);
+            foreach (var town in RailroadGraph.Towns)
+            {
+                Vector3 pos = WorldPos(town);
+                min = Vector3.Min(min, pos);
+                max = Vector3.Max(max, pos);
+            }
+
+            Vector3 center = (min + max) * 0.5f;
+            Vector3 size = max - min;
+            float pad = 14f;
             var field = GameObject.CreatePrimitive(PrimitiveType.Plane);
             field.name = "Ground";
             field.transform.SetParent(_root, false);
-            field.transform.position = new Vector3(0.5f, 0f, 4f);
-            field.transform.localScale = new Vector3(7.2f, 1f, 7.0f);
+            field.transform.position = new Vector3(center.x, 0f, center.z);
+            field.transform.localScale = new Vector3((size.x + pad) / 10f, 1f, (size.z + pad) / 10f);
             field.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Grass;
             Object.Destroy(field.GetComponent<Collider>());
 
-            Hill(new Vector3(-18f, -0.4f, -8f), new Vector3(7f, 2.0f, 5f));
-            Hill(new Vector3(18f, -0.5f, 10f), new Vector3(6f, 2.2f, 5.5f));
-            Hill(new Vector3(-16f, -0.35f, 16f), new Vector3(5.5f, 1.8f, 5f));
-            Hill(new Vector3(8f, -0.6f, 20f), new Vector3(6.5f, 2.4f, 5f));
+            Hill(center + new Vector3(-size.x * 0.65f - 4f, -0.4f, -size.z * 0.35f - 2f), new Vector3(7f, 2.0f, 5f));
+            Hill(center + new Vector3(size.x * 0.6f + 4f, -0.5f, size.z * 0.2f), new Vector3(6f, 2.2f, 5.5f));
+            Hill(center + new Vector3(-size.x * 0.5f - 3f, -0.35f, size.z * 0.55f + 3f), new Vector3(5.5f, 1.8f, 5f));
+            Hill(center + new Vector3(size.x * 0.15f, -0.6f, size.z * 0.7f + 4f), new Vector3(6.5f, 2.4f, 5f));
 
+            foreach (var landmark in RailroadGraph.Map.Landmarks)
+            {
+                Vector3 at = WorldPos(RailroadGraph.Get(landmark.TownId));
+                if (landmark.Kind == LandmarkDef.Lake)
+                    Water("Lake", at + new Vector3(2.8f, 0.02f, -2.2f), new Vector3(4.2f, 0.04f, 2.6f));
+                else if (landmark.Kind == LandmarkDef.Marsh)
+                    Water("Marsh", at + new Vector3(2.4f, 0.02f, -1.8f), new Vector3(3.4f, 0.04f, 2.2f));
+            }
+        }
+
+        private void Water(string name, Vector3 position, Vector3 scale)
+        {
             var pond = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            pond.name = "Lake";
+            pond.name = name;
             pond.transform.SetParent(_root, false);
-            pond.transform.position = WorldPos(RailroadGraph.Get(RailroadGraph.Lakeside)) + new Vector3(2.8f, 0.02f, -2.2f);
-            pond.transform.localScale = new Vector3(4.2f, 0.04f, 2.6f);
+            pond.transform.position = position;
+            pond.transform.localScale = scale;
             pond.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Water;
             Object.Destroy(pond.GetComponent<Collider>());
-
-            var marsh = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
-            marsh.name = "Marsh";
-            marsh.transform.SetParent(_root, false);
-            marsh.transform.position = WorldPos(RailroadGraph.Get(RailroadGraph.Saltmarsh)) + new Vector3(2.4f, 0.02f, -1.8f);
-            marsh.transform.localScale = new Vector3(3.4f, 0.04f, 2.2f);
-            marsh.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Water;
-            Object.Destroy(marsh.GetComponent<Collider>());
         }
 
         private void DrawRails()

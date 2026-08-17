@@ -1,0 +1,53 @@
+# Railroad map
+#
+# List towns and the tracks that connect them. Positions are laid out
+# automatically from those connections. Travel time and fare use track length.
+#
+#   title  <text>                 HUD name
+#   start  <townId>               where the train begins
+#   speed  <secondsPerDistance>   travel time per distance (default 0.45)
+#   minhop <seconds>              shortest one-track ride (default 0.7)
+#
+#   town <id> <name> [neighbors...]
+#        id    lowercase key, no spaces (letters, numbers, _ -)
+#        name  quote it if it has spaces:
+#              town mill_haven "Mill Haven"
+#        neighbors here are optional; track lines are the usual way
+#
+#   track <id> <id> [length]
+#        Two-way rail. List each pair once.
+#        Omit length to use the default hop (8). A larger length makes a
+#        longer ride and pushes the towns farther apart on the map:
+#              track millhaven lakeside 12
+#              track millhaven portmere 8
+#
+#   landmark lake <townId>
+#   landmark marsh <townId>
+#
+# Copy this file to make a new map, then drop it on RailroadBootstrap's Map File
+# field, or replace this file at Assets/Knightworld/Resources/Maps/the-local.txt
+
+title The Local
+start tutorialIsland
+speed 0.45
+minhop 0.7
+
+town tutorialIsland Tutorial1
+town outskirts Outskirts
+
+town ny NewYork
+town sc SanClemente
+town sd SanDiego
+
+track tutorialIsland sc 4
+track tutorialIsland sd 3
+
+track tutorialIsland outskirts 6
+track ny outskirts 7
+
+track ny sc 20
+track sc sd 3
+
+
+# landmark lake lakeside
+# landmark marsh saltmarsh
