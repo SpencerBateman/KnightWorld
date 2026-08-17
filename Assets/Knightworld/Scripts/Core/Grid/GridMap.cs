@@ -3,9 +3,18 @@ using System.Collections.Generic;
 
 namespace Knightworld.Core
 {
+    public enum CellFeature
+    {
+        None = 0,
+        Tree = 1,
+        Wall = 2
+    }
+
     public sealed class GridCell
     {
         public bool Walkable { get; set; } = true;
+        public bool BlocksSight { get; set; }
+        public CellFeature Feature { get; set; }
         public int Height { get; set; }
         public CoverLevel North { get; set; }
         public CoverLevel East { get; set; }
@@ -63,6 +72,36 @@ namespace Knightworld.Core
             pos.X >= 0 && pos.Y >= 0 && pos.X < Width && pos.Y < Height;
 
         public bool IsWalkable(GridPos pos) => InBounds(pos) && this[pos].Walkable;
+
+        public bool BlocksLineOfSight(GridPos pos)
+        {
+            if (!InBounds(pos))
+                return true;
+            var cell = this[pos];
+            if (cell.Feature == CellFeature.Tree)
+                return false;
+            return cell.BlocksSight || !cell.Walkable;
+        }
+
+        public void PlaceWall(GridPos pos)
+        {
+            if (!InBounds(pos))
+                return;
+            var cell = this[pos];
+            cell.Walkable = false;
+            cell.BlocksSight = true;
+            cell.Feature = CellFeature.Wall;
+        }
+
+        public void PlaceTree(GridPos pos)
+        {
+            if (!InBounds(pos))
+                return;
+            var cell = this[pos];
+            cell.Walkable = false;
+            cell.BlocksSight = false;
+            cell.Feature = CellFeature.Tree;
+        }
 
         public int Index(GridPos pos) => pos.Y * Width + pos.X;
 
@@ -159,7 +198,7 @@ namespace Knightworld.Core
                 var b = cells[i + 1];
                 if (EdgeCoverBetween(a, b) == CoverLevel.Wall)
                     return false;
-                if (!b.Equals(to) && !IsWalkable(b))
+                if (!b.Equals(to) && BlocksLineOfSight(b))
                     return false;
             }
 

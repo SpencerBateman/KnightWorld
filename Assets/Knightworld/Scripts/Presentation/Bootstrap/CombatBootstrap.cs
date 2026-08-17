@@ -41,6 +41,8 @@ namespace Knightworld.Bootstrap
             var iso = camera.GetComponent<IsoCameraController>();
             if (iso == null)
                 iso = camera.gameObject.AddComponent<IsoCameraController>();
+            iso.Distance = 24f;
+            iso.MaxDistance = 42f;
             iso.FocusImmediate(GridWorld.MapCenter(map));
 
             var hud = CombatHud.Create(session);
@@ -62,11 +64,11 @@ namespace Knightworld.Bootstrap
                 return TestDungeon.CreateUnits();
             return new List<UnitState>
             {
-                encounter.CreateFighter(1, "Aldric", new GridPos(2, 2)),
-                encounter.CreateWizard(2, "Seraphine", new GridPos(3, 2)),
-                encounter.CreateGoblin(3, "Goblin Scout", new GridPos(8, 7)),
-                encounter.CreateGoblin(4, "Goblin Cutthroat", new GridPos(9, 6)),
-                encounter.CreateGoblin(5, "Goblin Archer", new GridPos(6, 8))
+                encounter.CreateFighter(1, "Aldric", new GridPos(3, 3)),
+                encounter.CreateWizard(2, "Seraphine", new GridPos(4, 3)),
+                encounter.CreateGoblin(3, "Goblin Scout", new GridPos(19, 13)),
+                encounter.CreateGoblin(4, "Goblin Cutthroat", new GridPos(20, 12)),
+                encounter.CreateGoblin(5, "Goblin Archer", new GridPos(17, 14))
             };
         }
     }

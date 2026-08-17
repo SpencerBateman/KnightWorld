@@ -59,6 +59,42 @@ namespace Knightworld.Tests
         }
 
         [Test]
+        public void PathsAroundTreesAndWalls()
+        {
+            var map = new GridMap(6, 3);
+            map.PlaceTree(new GridPos(2, 1));
+            map.PlaceWall(new GridPos(2, 0));
+            map.PlaceWall(new GridPos(2, 2));
+            var path = Pathfinder.FindPath(map, new GridPos(0, 1), new GridPos(4, 1), _ => false, _ => false);
+            Assert.IsNull(path);
+
+            map = new GridMap(6, 3);
+            map.PlaceTree(new GridPos(2, 1));
+            map.PlaceWall(new GridPos(2, 0));
+            path = Pathfinder.FindPath(map, new GridPos(0, 1), new GridPos(4, 1), _ => false, _ => false);
+            Assert.IsNotNull(path);
+            Assert.IsFalse(path.Contains(new GridPos(2, 1)));
+            Assert.IsFalse(path.Contains(new GridPos(2, 0)));
+            Assert.AreEqual(new GridPos(4, 1), path[path.Count - 1]);
+        }
+
+        [Test]
+        public void TreesDoNotBlockLineOfSight()
+        {
+            var map = new GridMap(5, 1);
+            map.PlaceTree(new GridPos(2, 0));
+            Assert.IsTrue(map.HasLineOfSight(new GridPos(0, 0), new GridPos(4, 0)));
+        }
+
+        [Test]
+        public void PlacedWallsBlockLineOfSight()
+        {
+            var map = new GridMap(5, 1);
+            map.PlaceWall(new GridPos(2, 0));
+            Assert.IsFalse(map.HasLineOfSight(new GridPos(0, 0), new GridPos(4, 0)));
+        }
+
+        [Test]
         public void CanPathThroughAllyButNotEnemy()
         {
             var map = new GridMap(5, 1);

@@ -6,6 +6,11 @@ namespace Knightworld.Presentation
     public static class GridWorld
     {
         public const float CellSize = 1f;
+        public const float TileHeight = 0.25f;
+        public const float FieldY = -0.4f;
+        public const float HighlightY = 0.28f;
+        public const float UnitY = 1.15f;
+        public const float MoveSecondsPerTile = 0.13f;
 
         public static Vector3 CellCenter(GridPos pos, float y = 0f)
         {

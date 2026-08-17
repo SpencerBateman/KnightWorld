@@ -13,7 +13,7 @@ namespace Knightworld.Presentation
             var go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
             go.name = unit.Name;
             go.transform.SetParent(parent, false);
-            go.transform.position = GridWorld.CellCenter(unit.Position, 1f);
+            go.transform.position = GridWorld.CellCenter(unit.Position, GridWorld.UnitY);
             go.transform.localScale = new Vector3(0.55f, 0.9f, 0.55f);
             var view = go.AddComponent<UnitView>();
             view.Unit = unit;
@@ -26,7 +26,7 @@ namespace Knightworld.Presentation
         {
             if (Unit == null)
                 return;
-            transform.position = GridWorld.CellCenter(Unit.Position, Unit.IsDead ? 0.35f : 1f);
+            transform.position = GridWorld.CellCenter(Unit.Position, Unit.IsDead ? GridWorld.TileHeight + 0.15f : GridWorld.UnitY);
             if (Unit.IsDead)
                 transform.localScale = new Vector3(0.9f, 0.2f, 0.55f);
             RefreshVisual(false);
