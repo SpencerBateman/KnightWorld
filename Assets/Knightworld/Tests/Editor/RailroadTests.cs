@@ -39,6 +39,7 @@ namespace Knightworld.Tests
             float millhavenToLakeside = RailroadGraph.TravelSeconds(RailroadGraph.Distance(RailroadGraph.Millhaven, RailroadGraph.Lakeside));
             Assert.Greater(RailroadGraph.Distance(RailroadGraph.Millhaven, RailroadGraph.Lakeside), RailroadGraph.Distance(RailroadGraph.Millhaven, RailroadGraph.Portmere));
             Assert.Greater(millhavenToLakeside, millhavenToPortmere);
+            Assert.LessOrEqual(millhavenToLakeside, RailroadMap.MaxHopSeconds);
         }
 
         [Test]
@@ -50,6 +51,62 @@ namespace Knightworld.Tests
             float viaLakeside = RailroadGraph.Distance(RailroadGraph.Millhaven, RailroadGraph.Lakeside)
                                 + RailroadGraph.Distance(RailroadGraph.Lakeside, RailroadGraph.Emberford);
             Assert.Less(viaPortmere, viaLakeside);
+        }
+
+        [Test]
+        public void NoHopTakesMoreThanFiveSeconds()
+        {
+            foreach (var from in RailroadGraph.Towns)
+            {
+                foreach (var link in from.Links)
+                {
+                    float hop = RailroadGraph.TravelSeconds(RailroadGraph.Distance(from.Id, link));
+                    Assert.LessOrEqual(hop, RailroadMap.MaxHopSeconds, from.Id + " to " + link);
+                    Assert.Greater(hop, 0f);
+                }
+            }
+
+            Assert.AreEqual(RailroadMap.MaxHopSeconds, RailroadGraph.TravelSeconds(1000f));
+        }
+
+        [Test]
+        public void LockedRouteStaysClosedUntilBoughtAtTheStation()
+        {
+            RailroadGraph.Use(RailroadMapParser.Parse(@"
+start sc
+town sc SanClemente
+town hidden Hidden
+locked sc hidden 5 100
+"));
+            var session = new RailSession(new SeededRandom(1), "sc");
+            Assert.IsTrue(RailroadGraph.AreLinked("sc", "hidden"));
+            Assert.IsFalse(session.CanRide("sc", "hidden"));
+            Assert.IsFalse(session.TryBuyRoute("hidden"));
+            session.Grant(100);
+            Assert.IsTrue(session.TryBuyRoute("hidden"));
+            Assert.AreEqual(0, session.Score);
+            Assert.IsTrue(session.CanRide("sc", "hidden"));
+            Assert.IsTrue(session.CanRide("hidden", "sc"));
+            Assert.IsFalse(session.TryBuyRoute("hidden"));
+        }
+
+        [Test]
+        public void LockedRouteCannotBeBoughtFromADifferentTown()
+        {
+            RailroadGraph.Use(RailroadMapParser.Parse(@"
+start ny
+town ny NewYork
+town sc SanClemente
+town hidden Hidden
+track ny sc 4
+locked sc hidden 5 100
+"));
+            var session = new RailSession(new SeededRandom(1), "ny");
+            session.Grant(100);
+            Assert.IsFalse(session.TryBuyRoute("hidden"));
+            session.Arrive("sc");
+            Assert.IsTrue(session.TryBuyRoute("hidden"));
+            Assert.IsTrue(session.CanRide("sc", "hidden"));
         }
 
         [Test]
@@ -202,6 +259,28 @@ namespace Knightworld.Tests
         }
 
         [Test]
+        public void PassengersRollInWhenTheTrainMoves()
+        {
+            var session = NewSession();
+            for (int i = 0; i < 20; i++)
+                session.RollPassengersOnMove();
+            Assert.AreEqual(0, session.Waiting[RailroadGraph.Millhaven].Count);
+            Assert.Greater(CountWaiting(session), 0);
+        }
+
+        [Test]
+        public void MoveSpawnRespectsWaitingCap()
+        {
+            var session = NewSession();
+            session.Arrive(RailroadGraph.Millhaven);
+            for (int i = 0; i < RailSession.MaxWaitingPerTown; i++)
+                Assert.IsTrue(session.TrySpawnAt(RailroadGraph.Portmere));
+            for (int i = 0; i < 20; i++)
+                session.RollPassengersOnMove();
+            Assert.AreEqual(RailSession.MaxWaitingPerTown, session.Waiting[RailroadGraph.Portmere].Count);
+        }
+
+        [Test]
         public void SeedPlacesPeopleAtEveryTown()
         {
             var session = NewSession();
@@ -287,6 +366,14 @@ namespace Knightworld.Tests
         private static RailSession NewSession()
         {
             return new RailSession(new SeededRandom(7), RailroadGraph.Millhaven);
+        }
+
+        private static int CountWaiting(RailSession session)
+        {
+            int count = 0;
+            foreach (var town in RailroadGraph.Towns)
+                count += session.Waiting[town.Id].Count;
+            return count;
         }
 
         private static void BuySeatsUntil(RailSession session, int seats)

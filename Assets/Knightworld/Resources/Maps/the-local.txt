@@ -5,8 +5,9 @@
 #
 #   title  <text>                 HUD name
 #   start  <townId>               where the train begins
-#   speed  <secondsPerDistance>   travel time per distance (default 0.45)
-#   minhop <seconds>              shortest one-track ride (default 0.7)
+#   speed  <secondsPerDistance>   travel time per distance (default 0.25)
+#   minhop <seconds>              shortest one-track ride (default 1.5)
+#        Rides are also capped at 5 seconds.
 #
 #   town <id> <name> [neighbors...]
 #        id    lowercase key, no spaces (letters, numbers, _ -)
@@ -21,6 +22,11 @@
 #              track millhaven lakeside 12
 #              track millhaven portmere 8
 #
+#   locked <id> <id> [length] <cost>
+#        A track you cannot ride until it is bought at either town's
+#        station screen. Same as track, with a point cost at the end:
+#              locked sc hidden 5 100
+#
 #   landmark lake <townId>
 #   landmark marsh <townId>
 #
@@ -29,8 +35,8 @@
 
 title The Local
 start tutorialIsland
-speed 0.45
-minhop 0.7
+speed 0.25
+minhop 1.5
 
 town tutorialIsland Tutorial1
 town outskirts Outskirts
@@ -39,17 +45,25 @@ town wv West
 town ny NewYork
 town sc SanClemente
 town sd SanDiego
+town hidden Hidden
+town hiddenbeach HiddenBeach
+town hiddenpoint HiddenPoint
 
-track tutorialIsland sc 4
+
 track tutorialIsland sd 3
-track tutorialIsland outskirts 6
 track ny outskirts 7
 
-track ny sc 20
+lock ny sc 20 35
+
 track sc sd 3
-track ev ny 4
+locked ev ny 3 100
 track wv ny 4
 track wv ev 2
+track hiddenbeach hiddenpoint 6
+
+
+locked outskirts hidden 7 100
+track hiddenbeach hidden 9
 
 
 

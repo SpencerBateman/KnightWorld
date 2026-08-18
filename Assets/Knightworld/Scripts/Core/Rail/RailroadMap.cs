@@ -36,10 +36,40 @@ namespace Knightworld.Core
         }
     }
 
+    public sealed class LockedTrackDef
+    {
+        public string A { get; }
+        public string B { get; }
+        public float Length { get; }
+        public int Cost { get; }
+
+        public LockedTrackDef(string a, string b, float length, int cost)
+        {
+            A = a;
+            B = b;
+            Length = length;
+            Cost = cost;
+        }
+
+        public bool Touches(string townId) => townId == A || townId == B;
+
+        public string Other(string townId)
+        {
+            if (townId == A)
+                return B;
+            if (townId == B)
+                return A;
+            return null;
+        }
+    }
+
     public sealed class RailroadMap
     {
         private readonly Dictionary<string, TownDef> _byId = new Dictionary<string, TownDef>(StringComparer.Ordinal);
         private readonly Dictionary<string, float> _trackLength = new Dictionary<string, float>(StringComparer.Ordinal);
+        private readonly Dictionary<string, LockedTrackDef> _locked = new Dictionary<string, LockedTrackDef>(StringComparer.Ordinal);
+
+        public const float MaxHopSeconds = 5f;
 
         public string Title { get; }
         public string StartTownId { get; }
@@ -47,6 +77,7 @@ namespace Knightworld.Core
         public float MinHopSeconds { get; }
         public IReadOnlyList<TownDef> Towns { get; }
         public IReadOnlyList<LandmarkDef> Landmarks { get; }
+        public IReadOnlyList<LockedTrackDef> LockedTracks { get; }
 
         public RailroadMap(
             string title,
@@ -55,11 +86,13 @@ namespace Knightworld.Core
             float minHopSeconds,
             IReadOnlyList<TownDef> towns,
             IReadOnlyList<LandmarkDef> landmarks,
-            IReadOnlyDictionary<string, float> trackLengths)
+            IReadOnlyDictionary<string, float> trackLengths,
+            IReadOnlyList<LockedTrackDef> lockedTracks = null)
         {
             Title = string.IsNullOrEmpty(title) ? "Railroad" : title;
             Towns = towns;
             Landmarks = landmarks ?? Array.Empty<LandmarkDef>();
+            LockedTracks = lockedTracks ?? Array.Empty<LockedTrackDef>();
             SecondsPerDistance = secondsPerDistance;
             MinHopSeconds = minHopSeconds;
             for (int i = 0; i < towns.Count; i++)
@@ -72,6 +105,12 @@ namespace Knightworld.Core
             {
                 foreach (var pair in trackLengths)
                     _trackLength[pair.Key] = pair.Value;
+            }
+
+            for (int i = 0; i < LockedTracks.Count; i++)
+            {
+                var locked = LockedTracks[i];
+                _locked[TrackKey(locked.A, locked.B)] = locked;
             }
         }
 
@@ -95,6 +134,31 @@ namespace Knightworld.Core
             }
 
             return false;
+        }
+
+        public bool IsLocked(string fromId, string toId)
+        {
+            return fromId != null && toId != null && _locked.ContainsKey(TrackKey(fromId, toId));
+        }
+
+        public LockedTrackDef LockedTrack(string fromId, string toId)
+        {
+            if (fromId == null || toId == null)
+                return null;
+            _locked.TryGetValue(TrackKey(fromId, toId), out var locked);
+            return locked;
+        }
+
+        public List<LockedTrackDef> LockedFrom(string townId)
+        {
+            var found = new List<LockedTrackDef>();
+            for (int i = 0; i < LockedTracks.Count; i++)
+            {
+                if (LockedTracks[i].Touches(townId))
+                    found.Add(LockedTracks[i]);
+            }
+
+            return found;
         }
 
         public float Euclidean(string fromId, string toId)
@@ -128,7 +192,11 @@ namespace Knightworld.Core
         public float TravelSeconds(float distance)
         {
             float seconds = distance * SecondsPerDistance;
-            return seconds < MinHopSeconds ? MinHopSeconds : seconds;
+            if (seconds < MinHopSeconds)
+                seconds = MinHopSeconds;
+            if (seconds > MaxHopSeconds)
+                seconds = MaxHopSeconds;
+            return seconds;
         }
 
         public float RouteTravelSeconds(IReadOnlyList<string> route)

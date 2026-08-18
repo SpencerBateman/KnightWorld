@@ -128,8 +128,8 @@ namespace Knightworld.Presentation
         {
             float pad = 22f;
             Vector3 size = _max - _min;
-            Prim(PrimitiveType.Plane, "Earth", new Vector3(_center.x, -0.04f, _center.z), new Vector3((size.x + pad + 18f) / 10f, 1f, (size.z + pad + 18f) / 10f), RailroadMaterials.Earth);
-            Prim(PrimitiveType.Plane, "Ground", new Vector3(_center.x, 0f, _center.z), new Vector3((size.x + pad) / 10f, 1f, (size.z + pad) / 10f), RailroadMaterials.Grass);
+            Prim(PrimitiveType.Plane, "Earth", WorldLayers.Lift(_center, WorldLayers.Earth), new Vector3((size.x + pad + 18f) / 10f, 1f, (size.z + pad + 18f) / 10f), RailroadMaterials.Earth);
+            Prim(PrimitiveType.Plane, "Ground", WorldLayers.Lift(_center, WorldLayers.Grass), new Vector3((size.x + pad) / 10f, 1f, (size.z + pad) / 10f), RailroadMaterials.Grass);
 
             int meadows = 6 + _towns.Count;
             for (int i = 0; i < meadows; i++)
@@ -140,7 +140,7 @@ namespace Knightworld.Presentation
                 float w = Rand(4.5f, 9f);
                 float d = Rand(3.5f, 7.5f);
                 var mat = Rand01() > 0.45f ? RailroadMaterials.Meadow : RailroadMaterials.DeepGrass;
-                Prim(PrimitiveType.Cylinder, "Meadow", at + Vector3.up * 0.015f, new Vector3(w, 0.02f, d), mat);
+                Prim(PrimitiveType.Cylinder, "Meadow", WorldLayers.Lift(at, WorldLayers.Meadow, i), new Vector3(w, WorldLayers.MeadowHalf, d), mat);
             }
         }
 
@@ -202,7 +202,7 @@ namespace Knightworld.Presentation
             Pond(a + side * Rand(2.2f, 3.8f), Rand(2.8f, 4.2f), Rand(1.8f, 3f), RailroadMaterials.ShallowWater, 0.55f);
             if (vibe.Coast >= 0.5f)
             {
-                Prim(PrimitiveType.Cylinder, "Shore", a - outward * 0.8f + Vector3.up * 0.02f, new Vector3(Rand(3f, 4.6f), 0.03f, Rand(1.6f, 2.4f)), RailroadMaterials.Sand);
+                Prim(PrimitiveType.Cylinder, "Shore", WorldLayers.Lift(a - outward * 0.8f, WorldLayers.Sand), new Vector3(Rand(3f, 4.6f), WorldLayers.SandHalf, Rand(1.6f, 2.4f)), RailroadMaterials.Sand);
             }
         }
 
@@ -249,9 +249,9 @@ namespace Knightworld.Presentation
             Vector3 flat = Flatten(position);
             if (TownClearance(flat) < 2.1f)
                 return;
-            var pond = Prim(PrimitiveType.Cylinder, "Water", flat + Vector3.up * 0.03f, new Vector3(width, 0.045f, depth), water);
+            var pond = Prim(PrimitiveType.Cylinder, "Water", WorldLayers.Lift(flat, WorldLayers.WaterY(water), _waters.Count), new Vector3(width, WorldLayers.WaterHalf, depth), water);
             _waters.Add(flat);
-            Prim(PrimitiveType.Cylinder, "Shallows", flat + Vector3.up * 0.018f, new Vector3(width * 1.18f, 0.02f, depth * 1.18f), RailroadMaterials.Shore);
+            Prim(PrimitiveType.Cylinder, "Shallows", WorldLayers.Lift(flat, WorldLayers.Shore, _waters.Count), new Vector3(width * 1.18f, WorldLayers.ShoreHalf, depth * 1.18f), RailroadMaterials.Shore);
             if (sheen > 0.3f)
             {
                 var gleam = pond.AddComponent<WaterSheen>();

@@ -9,7 +9,6 @@ namespace Knightworld.Presentation
     public sealed class RailroadController : MonoBehaviour
     {
         public const string SceneName = "Railroad";
-        private const float SpawnSeconds = 7f;
 
         private RailSession _session;
         private RailroadView _view;
@@ -18,7 +17,6 @@ namespace Knightworld.Presentation
         private RailroadShopScreen _shop;
         private Camera _camera;
         private bool _busy;
-        private float _spawnTimer;
         private string _banner;
 
         public void Initialize(RailSession session, RailroadView view, RailroadHud hud, Camera worldCamera)
@@ -29,11 +27,11 @@ namespace Knightworld.Presentation
             _station = hud.Station;
             _shop = hud.Shop;
             _camera = worldCamera;
-            _spawnTimer = SpawnSeconds;
             _station.BoardClicked += OnBoard;
             _station.AlightClicked += OnAlight;
             _station.DepartClicked += OnDepart;
             _station.ShopClicked += OnOpenShop;
+            _station.UnlockRouteClicked += OnUnlockRoute;
             _shop.BuySeatClicked += OnBuySeat;
             _shop.BuyCarriageClicked += OnBuyCarriage;
             _shop.BackClicked += OnShopBack;
@@ -52,6 +50,7 @@ namespace Knightworld.Presentation
                 _station.AlightClicked -= OnAlight;
                 _station.DepartClicked -= OnDepart;
                 _station.ShopClicked -= OnOpenShop;
+                _station.UnlockRouteClicked -= OnUnlockRoute;
             }
 
             if (_shop != null)
@@ -67,25 +66,6 @@ namespace Knightworld.Presentation
             if (_view == null || _session == null)
                 return;
             _view.FaceLabels(_camera);
-            if (!_busy)
-            {
-                _spawnTimer -= Time.deltaTime;
-                if (_spawnTimer <= 0f)
-                {
-                    if (_session.TrySpawnPassenger())
-                    {
-                        _view.RefreshPassengers(_session);
-                        if (_station.IsOpen)
-                            _station.Refresh(null);
-                        if (_shop != null && _shop.IsOpen)
-                            _shop.Refresh(null);
-                    }
-
-                    _spawnTimer = SpawnSeconds;
-                    _hud.Refresh(_session, _banner);
-                }
-            }
-
             if (_busy || UiOpen)
                 return;
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
@@ -205,6 +185,30 @@ namespace Knightworld.Presentation
             _hud.Refresh(_session, _banner);
         }
 
+        private void OnUnlockRoute(string otherTownId)
+        {
+            var other = RailroadGraph.Get(otherTownId);
+            var locked = RailroadGraph.LockedTrack(_session.CurrentTownId, otherTownId);
+            if (_session.TryBuyRoute(otherTownId))
+            {
+                _view.UnlockTrack(_session.CurrentTownId, otherTownId);
+                _banner = $"Opened the line to {other.Name}.";
+                _view.RefreshPassengers(_session);
+                _hud.Refresh(_session, _banner);
+                _station.Refresh(_banner);
+                return;
+            }
+
+            if (_session.RouteOwned(_session.CurrentTownId, otherTownId))
+                _banner = $"The line to {other.Name} is already open.";
+            else if (locked != null)
+                _banner = $"Need {locked.Cost} points to unlock the line to {other.Name}.";
+            else
+                _banner = "That line cannot be bought here.";
+            _station.Refresh(_banner);
+            _hud.Refresh(_session, _banner);
+        }
+
         private void OnDepart()
         {
             _shop.Close();
@@ -230,8 +234,8 @@ namespace Knightworld.Presentation
             var town = RailroadGraph.Get(townId);
             if (town.Id == _session.CurrentTownId)
                 _hud.SetTooltip($"Click to open the {town.Name} platform.");
-            else if (!RailroadGraph.AreLinked(_session.CurrentTownId, town.Id))
-                _hud.SetTooltip($"{town.Name} is not on a connecting track.");
+            else if (!_session.CanRide(_session.CurrentTownId, town.Id))
+                _hud.SetTooltip(LockedRideLabel(town));
             else
                 _hud.SetTooltip($"Ride to {town.Name}. {TravelLabel(town.Id)}");
         }
@@ -260,6 +264,13 @@ namespace Knightworld.Presentation
                 return;
             }
 
+            if (!_session.CanRide(_session.CurrentTownId, townId))
+            {
+                _banner = LockedRideLabel(RailroadGraph.Get(townId));
+                _hud.Refresh(_session, _banner);
+                return;
+            }
+
             StartCoroutine(Ride(_session.CurrentTownId, townId));
         }
 
@@ -267,20 +278,10 @@ namespace Knightworld.Presentation
         {
             _busy = true;
             _hud.SetTooltip("");
-            yield return Hop(fromId, toId);
-
-            _session.Arrive(toId);
-            _view.SnapTrain(_session.CurrentTownId);
+            _session.RollPassengersOnMove();
             _view.RefreshPassengers(_session);
-            var town = RailroadGraph.Get(_session.CurrentTownId);
-            _banner = "Arrived at " + town.Name + ".";
-            _hud.Refresh(_session, _banner);
-            _busy = false;
-            OpenStation($"Arrived at {town.Name}. Board travelers, drop passengers, or visit the shop.");
-        }
-
-        private IEnumerator Hop(string fromId, string toId)
-        {
+            var fromTown = RailroadGraph.Get(fromId);
+            var toTown = RailroadGraph.Get(toId);
             Vector3 from = _view.TrainPos(fromId);
             Vector3 to = _view.TrainPos(toId);
             Vector3 delta = to - from;
@@ -289,11 +290,18 @@ namespace Knightworld.Presentation
                 _view.Train.rotation = Quaternion.LookRotation(delta);
 
             float hopSeconds = RailroadGraph.TravelSeconds(RailroadGraph.Distance(fromId, toId));
-            float elapsed = 0f;
             var iso = _camera != null ? _camera.GetComponent<IsoCameraController>() : null;
+            if (iso != null)
+                iso.FrameRoute(from, to);
+            _hud.BeginTravel(fromTown.Name, toTown.Name);
+            _hud.SetTravelRemaining(hopSeconds);
+
+            float elapsed = 0f;
             while (elapsed < hopSeconds)
             {
                 elapsed += Time.deltaTime;
+                float remaining = hopSeconds - elapsed;
+                _hud.SetTravelRemaining(remaining);
                 float t = Mathf.Clamp01(elapsed / hopSeconds);
                 t = t * t * (3f - 2f * t);
                 _view.Train.position = Vector3.Lerp(from, to, t);
@@ -303,6 +311,17 @@ namespace Knightworld.Presentation
             }
 
             _view.Train.position = to;
+            _hud.EndTravel();
+            if (iso != null)
+                iso.UnlockOn(to);
+
+            _session.Arrive(toId);
+            _view.SnapTrain(_session.CurrentTownId);
+            _view.RefreshPassengers(_session);
+            _banner = "Arrived at " + toTown.Name + ".";
+            _hud.Refresh(_session, _banner);
+            _busy = false;
+            OpenStation($"Arrived at {toTown.Name}. Board travelers, drop passengers, or visit the shop.");
         }
 
         private bool TryPickTown(out string townId)
@@ -347,10 +366,18 @@ namespace Knightworld.Presentation
             return townId != null;
         }
 
+        private string LockedRideLabel(TownDef town)
+        {
+            var locked = RailroadGraph.LockedTrack(_session.CurrentTownId, town.Id);
+            if (locked != null)
+                return $"The line to {town.Name} is locked. Buy it at this station for {locked.Cost}.";
+            return $"{town.Name} is not on a connecting track.";
+        }
+
         private string TravelLabel(string townId)
         {
-            int seconds = Mathf.Max(1, Mathf.RoundToInt(RailroadGraph.TravelSeconds(RailroadGraph.Distance(_session.CurrentTownId, townId))));
-            return seconds == 1 ? "1 second" : seconds + " seconds";
+            float seconds = RailroadGraph.TravelSeconds(RailroadGraph.Distance(_session.CurrentTownId, townId));
+            return RailroadHud.FormatDuration(seconds);
         }
     }
 }

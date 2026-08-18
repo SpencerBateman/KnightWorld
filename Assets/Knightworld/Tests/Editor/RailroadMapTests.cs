@@ -129,6 +129,71 @@ track a nowhere
         }
 
         [Test]
+        public void ParsesLockedTrackWithLengthAndCost()
+        {
+            var map = RailroadMapParser.Parse(@"
+start sc
+town sc SanClemente
+town hidden Hidden
+locked sc hidden 5 100
+");
+            Assert.AreEqual(1, map.LockedTracks.Count);
+            Assert.AreEqual(5f, map.Distance("sc", "hidden"), 0.001f);
+            Assert.IsTrue(map.AreLinked("sc", "hidden"));
+            Assert.IsTrue(map.IsLocked("sc", "hidden"));
+            Assert.AreEqual(100, map.LockedTrack("sc", "hidden").Cost);
+            Assert.AreEqual("hidden", map.LockedFrom("sc")[0].Other("sc"));
+        }
+
+        [Test]
+        public void LockedTrackCanOmitLength()
+        {
+            var map = RailroadMapParser.Parse(@"
+town a Alpha
+town b Beta
+locked a b 40
+");
+            Assert.AreEqual(RailroadMapLayout.DefaultTrackLength, map.Distance("a", "b"), 0.001f);
+            Assert.AreEqual(40, map.LockedTrack("a", "b").Cost);
+        }
+
+        [Test]
+        public void LockedTrackCannotReplaceAnOpenTrack()
+        {
+            var error = Assert.Throws<RailroadMapException>(() => RailroadMapParser.Parse(@"
+town a Alpha
+town b Beta
+track a b 8
+locked a b 8 100
+"));
+            StringAssert.Contains("already has a track", error.Message);
+        }
+
+        [Test]
+        public void LockedTrackRequiresACost()
+        {
+            var error = Assert.Throws<RailroadMapException>(() => RailroadMapParser.Parse(@"
+town a Alpha
+town b Beta
+locked a b
+"));
+            StringAssert.Contains("locked", error.Message);
+        }
+
+        [Test]
+        public void LockIsAnAliasForLocked()
+        {
+            var map = RailroadMapParser.Parse(@"
+town a Alpha
+town b Beta
+lock a b 6 25
+");
+            Assert.IsTrue(map.IsLocked("a", "b"));
+            Assert.AreEqual(6f, map.Distance("a", "b"), 0.001f);
+            Assert.AreEqual(25, map.LockedTrack("a", "b").Cost);
+        }
+
+        [Test]
         public void DefaultMapParsesWithTenTowns()
         {
             var map = RailroadMapParser.Parse(RailroadMaps.TheLocal);

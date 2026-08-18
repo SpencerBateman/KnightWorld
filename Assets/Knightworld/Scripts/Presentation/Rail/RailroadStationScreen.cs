@@ -11,6 +11,7 @@ namespace Knightworld.Presentation
         public event Action<int> AlightClicked;
         public event Action DepartClicked;
         public event Action ShopClicked;
+        public event Action<string> UnlockRouteClicked;
 
         private static readonly Color Gold = new Color(0.95f, 0.78f, 0.16f, 1f);
         private static readonly Color GoldDark = new Color(0.28f, 0.18f, 0.04f, 1f);
@@ -26,6 +27,8 @@ namespace Knightworld.Presentation
         private Coroutine _scoreRoutine;
         private Transform _travelers;
         private Transform _passengers;
+        private GameObject _routesRow;
+        private Transform _routes;
 
         public bool IsOpen => _root != null && _root.activeSelf;
 
@@ -66,6 +69,7 @@ namespace Knightworld.Presentation
             _destinations.text = RailroadHud.FormatDestinations(_session);
             FillColumn(_travelers, _session.WaitingHere, false);
             FillColumn(_passengers, _session.OnboardReadyFirst(), true);
+            FillRoutes();
         }
 
         public void PlayScoreBurst(int points)
@@ -96,8 +100,12 @@ namespace Knightworld.Presentation
             Label(card, "TravelersHeader", new Vector2(0f, 1f), new Vector2(56, -324), 24, TextAnchor.UpperLeft, new Vector2(540, 36)).text = "Travelers at this station";
             Label(card, "PassengersHeader", new Vector2(1f, 1f), new Vector2(-56, -324), 24, TextAnchor.UpperRight, new Vector2(540, 36)).text = "Passengers on the train";
 
-            _travelers = Column(card, "Travelers", new Vector2(0f, 1f), new Vector2(48, -364), new Vector2(560, 340));
-            _passengers = Column(card, "Passengers", new Vector2(1f, 1f), new Vector2(-48, -364), new Vector2(560, 340));
+            _travelers = Column(card, "Travelers", new Vector2(0f, 1f), new Vector2(48, -364), new Vector2(560, 280));
+            _passengers = Column(card, "Passengers", new Vector2(1f, 1f), new Vector2(-48, -364), new Vector2(560, 280));
+
+            _routesRow = Box("Routes", card.transform, new Vector2(0.5f, 0f), new Vector2(0, 118), new Vector2(1180, 72), new Color(0.08f, 0.09f, 0.12f, 0.95f));
+            _routes = _routesRow.transform;
+            _routesRow.SetActive(false);
 
             var shop = MakeButton(card, "Shop", new Vector2(0.5f, 0f), new Vector2(-170, 36), new Vector2(280, 64), () => ShopClicked?.Invoke());
             shop.GetComponent<Image>().color = new Color(0.22f, 0.52f, 0.34f, 0.95f);
@@ -158,6 +166,48 @@ namespace Knightworld.Presentation
                 rect.anchorMin = new Vector2(0.5f, 1f);
                 rect.anchorMax = new Vector2(0.5f, 1f);
                 rect.pivot = new Vector2(0.5f, 1f);
+            }
+        }
+
+        private void FillRoutes()
+        {
+            for (int i = _routes.childCount - 1; i >= 0; i--)
+                Destroy(_routes.GetChild(i).gameObject);
+
+            var locked = RailroadGraph.LockedFrom(_session.CurrentTownId);
+            var offers = new System.Collections.Generic.List<LockedTrackDef>();
+            for (int i = 0; i < locked.Count; i++)
+            {
+                string other = locked[i].Other(_session.CurrentTownId);
+                if (!_session.RouteOwned(_session.CurrentTownId, other))
+                    offers.Add(locked[i]);
+            }
+
+            if (offers.Count == 0)
+            {
+                _routesRow.SetActive(false);
+                return;
+            }
+
+            _routesRow.SetActive(true);
+            float width = 360f;
+            float gap = 16f;
+            float total = offers.Count * width + (offers.Count - 1) * gap;
+            float start = -total * 0.5f + width * 0.5f;
+            for (int i = 0; i < offers.Count; i++)
+            {
+                var route = offers[i];
+                string otherId = route.Other(_session.CurrentTownId);
+                string otherName = RailroadGraph.Get(otherId).Name;
+                bool canBuy = _session.Score >= route.Cost;
+                var button = MakeButton(_routesRow, otherName, new Vector2(0.5f, 0.5f), new Vector2(start + i * (width + gap), 0), new Vector2(width, 52), () =>
+                {
+                    UnlockRouteClicked?.Invoke(otherId);
+                });
+                button.GetComponent<Image>().color = canBuy
+                    ? new Color(0.22f, 0.52f, 0.34f, 0.95f)
+                    : new Color(0.32f, 0.34f, 0.36f, 0.92f);
+                button.transform.Find("Label").GetComponent<Text>().text = $"Unlock {otherName}  ·  {route.Cost}";
             }
         }
 

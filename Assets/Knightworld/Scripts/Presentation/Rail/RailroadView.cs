@@ -19,6 +19,7 @@ namespace Knightworld.Presentation
         private Transform _car;
         private RailroadScenery _scenery;
         private readonly Dictionary<string, DestPin> _destPins = new Dictionary<string, DestPin>();
+        private readonly Dictionary<string, GameObject> _lockedTracks = new Dictionary<string, GameObject>();
 
         public RailroadView(Transform root)
         {
@@ -101,7 +102,7 @@ namespace Knightworld.Presentation
                         _waiting[person.Id] = body;
                     }
 
-                    body.position = origin + side + new Vector3(0.7f * i, 0.45f, 0f);
+                    body.position = origin + side + new Vector3(0.7f * i, WorldLayers.Person, 0f);
                 }
             }
 
@@ -223,35 +224,69 @@ namespace Knightworld.Presentation
             {
                 foreach (var link in town.Links)
                 {
-                    string key = town.Id.CompareTo(link) < 0 ? town.Id + ">" + link : link + ">" + town.Id;
+                    string key = RailroadMap.TrackKey(town.Id, link);
                     if (!drawn.Add(key))
                         continue;
-                    Vector3 a = WorldPos(town) + Vector3.up * 0.05f;
-                    Vector3 b = WorldPos(RailroadGraph.Get(link)) + Vector3.up * 0.05f;
-                    DrawTrack(a, b);
+                    Vector3 a = WorldPos(town);
+                    Vector3 b = WorldPos(RailroadGraph.Get(link));
+                    if (RailroadGraph.IsLocked(town.Id, link))
+                        DrawLockedTrack(key, a, b);
+                    else
+                        DrawTrack(a, b);
                 }
+            }
+        }
+
+        public void UnlockTrack(string fromId, string toId)
+        {
+            string key = RailroadMap.TrackKey(fromId, toId);
+            if (_lockedTracks.TryGetValue(key, out var ghost))
+            {
+                Object.Destroy(ghost);
+                _lockedTracks.Remove(key);
+            }
+
+            DrawTrack(WorldPos(RailroadGraph.Get(fromId)), WorldPos(RailroadGraph.Get(toId)));
+        }
+
+        private void DrawLockedTrack(string key, Vector3 a, Vector3 b)
+        {
+            Vector3 delta = b - a;
+            float length = delta.magnitude;
+            Quaternion facing = Quaternion.LookRotation(delta.sqrMagnitude > 0.001f ? delta : Vector3.forward);
+
+            var root = new GameObject("Locked " + key);
+            root.transform.SetParent(_root, false);
+            _lockedTracks[key] = root;
+
+            int dashes = Mathf.Max(3, Mathf.RoundToInt(length / 1.15f));
+            for (int i = 0; i < dashes; i++)
+            {
+                float t = (i + 0.5f) / dashes;
+                var dash = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                dash.name = "Dash";
+                dash.transform.SetParent(root.transform, false);
+                dash.transform.position = WorldLayers.Lift(Vector3.Lerp(a, b, t), WorldLayers.Ballast);
+                dash.transform.rotation = facing;
+                dash.transform.localScale = new Vector3(0.38f, WorldLayers.BallastThick, length / dashes * 0.45f);
+                dash.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.LockedRail;
+                Object.Destroy(dash.GetComponent<Collider>());
             }
         }
 
         private void DrawTrack(Vector3 a, Vector3 b)
         {
+            Vector3 mid = (a + b) * 0.5f;
             Vector3 delta = b - a;
             float length = delta.magnitude;
-            var rails = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            rails.name = "Rails";
-            rails.transform.SetParent(_root, false);
-            rails.transform.position = (a + b) * 0.5f;
-            rails.transform.rotation = Quaternion.LookRotation(delta.sqrMagnitude > 0.001f ? delta : Vector3.forward);
-            rails.transform.localScale = new Vector3(0.42f, 0.06f, length);
-            rails.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Rail;
-            Object.Destroy(rails.GetComponent<Collider>());
+            Quaternion facing = Quaternion.LookRotation(delta.sqrMagnitude > 0.001f ? delta : Vector3.forward);
 
             var bed = GameObject.CreatePrimitive(PrimitiveType.Cube);
             bed.name = "Ballast";
             bed.transform.SetParent(_root, false);
-            bed.transform.position = (a + b) * 0.5f + Vector3.down * 0.02f;
-            bed.transform.rotation = rails.transform.rotation;
-            bed.transform.localScale = new Vector3(0.95f, 0.05f, length);
+            bed.transform.position = WorldLayers.Lift(mid, WorldLayers.Ballast);
+            bed.transform.rotation = facing;
+            bed.transform.localScale = new Vector3(0.95f, WorldLayers.BallastThick, length);
             bed.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Gravel;
             Object.Destroy(bed.GetComponent<Collider>());
 
@@ -262,12 +297,21 @@ namespace Knightworld.Presentation
                 var tie = GameObject.CreatePrimitive(PrimitiveType.Cube);
                 tie.name = "Tie";
                 tie.transform.SetParent(_root, false);
-                tie.transform.position = Vector3.Lerp(a, b, t);
-                tie.transform.rotation = rails.transform.rotation;
-                tie.transform.localScale = new Vector3(0.72f, 0.05f, 0.14f);
+                tie.transform.position = WorldLayers.Lift(Vector3.Lerp(a, b, t), WorldLayers.Tie, i);
+                tie.transform.rotation = facing;
+                tie.transform.localScale = new Vector3(0.72f, WorldLayers.TieThick, 0.14f);
                 tie.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Tie;
                 Object.Destroy(tie.GetComponent<Collider>());
             }
+
+            var rails = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            rails.name = "Rails";
+            rails.transform.SetParent(_root, false);
+            rails.transform.position = WorldLayers.Lift(mid, WorldLayers.Rail);
+            rails.transform.rotation = facing;
+            rails.transform.localScale = new Vector3(0.42f, WorldLayers.RailThick, length);
+            rails.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Rail;
+            Object.Destroy(rails.GetComponent<Collider>());
         }
 
         private void DrawTowns()
@@ -277,14 +321,14 @@ namespace Knightworld.Presentation
                 var pad = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 pad.name = town.Name;
                 pad.transform.SetParent(_root, false);
-                pad.transform.position = WorldPos(town) + Vector3.up * 0.08f;
-                pad.transform.localScale = new Vector3(2.1f, 0.08f, 2.1f);
+                pad.transform.position = WorldLayers.Lift(WorldPos(town), WorldLayers.Platform);
+                pad.transform.localScale = new Vector3(2.1f, WorldLayers.PlatformHalf, 2.1f);
                 pad.GetComponent<Renderer>().sharedMaterial = RailroadMaterials.Town(town.Id);
                 Object.Destroy(pad.GetComponent<Collider>());
 
-                House(WorldPos(town) + new Vector3(-0.55f, 0.45f, -0.35f), RailroadMaterials.Town(town.Id));
-                House(WorldPos(town) + new Vector3(0.45f, 0.38f, -0.55f), RailroadMaterials.TrainDark);
-                Store(WorldPos(town) + new Vector3(1.15f, 0.42f, 0.55f), RailroadMaterials.Town(town.Id), town.Id);
+                House(WorldPos(town) + new Vector3(-0.55f, WorldLayers.House, -0.35f), RailroadMaterials.Town(town.Id));
+                House(WorldPos(town) + new Vector3(0.45f, WorldLayers.HouseLow, -0.55f), RailroadMaterials.TrainDark);
+                Store(WorldPos(town) + new Vector3(1.15f, WorldLayers.Store, 0.55f), RailroadMaterials.Town(town.Id), town.Id);
 
                 var hit = new GameObject("Hit " + town.Id);
                 hit.transform.SetParent(_root, false);

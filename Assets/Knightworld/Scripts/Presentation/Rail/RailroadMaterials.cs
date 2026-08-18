@@ -38,6 +38,7 @@ namespace Knightworld.Presentation
         public static Material Sun { get; private set; }
         public static Material Haze { get; private set; }
         public static Material Gravel { get; private set; }
+        public static Material LockedRail { get; private set; }
         private static readonly System.Collections.Generic.Dictionary<string, Material> ExtraTowns =
             new System.Collections.Generic.Dictionary<string, Material>();
         public static Material Millhaven { get; private set; }
@@ -89,6 +90,7 @@ namespace Knightworld.Presentation
             Sun = Make(new Color(1f, 0.92f, 0.62f));
             Haze = Make(new Color(0.70f, 0.80f, 0.72f));
             Gravel = Make(new Color(0.50f, 0.42f, 0.32f));
+            LockedRail = Make(new Color(0.28f, 0.30f, 0.34f));
             Millhaven = Make(new Color(0.82f, 0.70f, 0.28f));
             Lakeside = Make(new Color(0.25f, 0.52f, 0.82f));
             Hillcrest = Make(new Color(0.32f, 0.68f, 0.38f));
@@ -99,6 +101,7 @@ namespace Knightworld.Presentation
             Copsewood = Make(new Color(0.22f, 0.48f, 0.24f));
             Northspire = Make(new Color(0.72f, 0.82f, 0.90f));
             Stonebridge = Make(new Color(0.58f, 0.56f, 0.52f));
+            StackQueues();
         }
 
         public static Material Town(string townId)
@@ -136,8 +139,40 @@ namespace Knightworld.Presentation
                 return material;
             float hue = ((townId.GetHashCode() & int.MaxValue) % 360) / 360f;
             material = Make(Color.HSVToRGB(hue, 0.55f, 0.82f));
+            WorldLayers.Queue(material, WorldLayers.QueuePlatform);
             ExtraTowns[townId] = material;
             return material;
+        }
+
+        private static void StackQueues()
+        {
+            WorldLayers.Queue(Earth, WorldLayers.QueueEarth);
+            WorldLayers.Queue(Haze, WorldLayers.QueueEarth);
+            WorldLayers.Queue(Grass, WorldLayers.QueueGrass);
+            WorldLayers.Queue(Hill, WorldLayers.QueueMeadow);
+            WorldLayers.Queue(Meadow, WorldLayers.QueueMeadow);
+            WorldLayers.Queue(DeepGrass, WorldLayers.QueueMeadow);
+            WorldLayers.Queue(Sand, WorldLayers.QueueSand);
+            WorldLayers.Queue(Shore, WorldLayers.QueueShore);
+            WorldLayers.Queue(MarshWater, WorldLayers.QueueMarsh);
+            WorldLayers.Queue(ShallowWater, WorldLayers.QueueShallow);
+            WorldLayers.Queue(Water, WorldLayers.QueueWater);
+            WorldLayers.Queue(DeepWater, WorldLayers.QueueDeep);
+            WorldLayers.Queue(Gravel, WorldLayers.QueueBallast);
+            WorldLayers.Queue(LockedRail, WorldLayers.QueueBallast);
+            WorldLayers.Queue(Tie, WorldLayers.QueueTie);
+            WorldLayers.Queue(Rail, WorldLayers.QueueRail);
+            WorldLayers.Queue(Millhaven, WorldLayers.QueuePlatform);
+            WorldLayers.Queue(Lakeside, WorldLayers.QueuePlatform);
+            WorldLayers.Queue(Hillcrest, WorldLayers.QueuePlatform);
+            WorldLayers.Queue(Emberford, WorldLayers.QueuePlatform);
+            WorldLayers.Queue(Portmere, WorldLayers.QueuePlatform);
+            WorldLayers.Queue(Willowgate, WorldLayers.QueuePlatform);
+            WorldLayers.Queue(Saltmarsh, WorldLayers.QueuePlatform);
+            WorldLayers.Queue(Copsewood, WorldLayers.QueuePlatform);
+            WorldLayers.Queue(Northspire, WorldLayers.QueuePlatform);
+            WorldLayers.Queue(Stonebridge, WorldLayers.QueuePlatform);
+            WorldLayers.Queue(Shop, WorldLayers.QueuePlatform);
         }
 
         private static Material Make(Color color)

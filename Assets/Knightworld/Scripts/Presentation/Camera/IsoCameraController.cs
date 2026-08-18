@@ -15,9 +15,28 @@ namespace Knightworld.Presentation
         public float ZoomSpeed = 4f;
         public float RotateSpeed = 180f;
         public float FollowLerp = 6f;
+        public bool InputLocked;
 
         private float _targetYaw;
         private Vector3 _followTarget;
+        private float _savedDistance;
+
+        public void FrameRoute(Vector3 from, Vector3 to)
+        {
+            InputLocked = true;
+            _savedDistance = Distance;
+            float span = Vector3.Distance(from, to);
+            float framed = Mathf.Clamp(span * 1.4f + 14f, 22f, 110f);
+            Distance = framed * 0.25f;
+            FocusImmediate(from);
+        }
+
+        public void UnlockOn(Vector3 target)
+        {
+            InputLocked = false;
+            Distance = _savedDistance > 0.1f ? _savedDistance : Distance;
+            FocusImmediate(target);
+        }
 
         public void FocusImmediate(Vector3 target)
         {
@@ -40,6 +59,13 @@ namespace Knightworld.Presentation
 
         private void Update()
         {
+            if (InputLocked)
+            {
+                LookTarget = Vector3.Lerp(LookTarget, _followTarget, 1f - Mathf.Exp(-FollowLerp * Time.deltaTime));
+                Apply();
+                return;
+            }
+
             var keyboard = Keyboard.current;
             if (keyboard != null)
             {

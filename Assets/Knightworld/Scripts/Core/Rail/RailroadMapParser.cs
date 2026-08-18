@@ -20,10 +20,11 @@ namespace Knightworld.Core
 
             string title = "";
             string start = "";
-            float speed = 0.45f;
-            float minHop = 0.7f;
+            float speed = 0.25f;
+            float minHop = 1.5f;
             var towns = new List<TownDraft>();
             var tracks = new List<TrackDraft>();
+            var locked = new List<LockedDraft>();
             var landmarks = new List<LandmarkDef>();
             var lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             for (int i = 0; i < lines.Length; i++)
@@ -58,12 +59,16 @@ namespace Knightworld.Core
                         case "track":
                             tracks.Add(ParseTrack(tokens));
                             break;
+                        case "locked":
+                        case "lock":
+                            locked.Add(ParseLocked(tokens));
+                            break;
                         case "landmark":
                             Need(tokens, 3, "landmark <lake|marsh> <townId>");
                             landmarks.Add(ParseLandmark(tokens));
                             break;
                         default:
-                            throw new RailroadMapException("Unknown command '" + tokens[0] + "'. Use title, start, speed, minhop, town, track, or landmark.");
+                            throw new RailroadMapException("Unknown command '" + tokens[0] + "'. Use title, start, speed, minhop, town, track, locked, or landmark.");
                     }
                 }
                 catch (RailroadMapException ex)
@@ -98,6 +103,17 @@ namespace Knightworld.Core
             for (int i = 0; i < tracks.Count; i++)
                 AddTrack(byId, lengths, tracks[i].A, tracks[i].B, tracks[i].Length);
 
+            var lockedTracks = new List<LockedTrackDef>();
+            for (int i = 0; i < locked.Count; i++)
+            {
+                var draft = locked[i];
+                string key = RailroadMap.TrackKey(draft.A, draft.B);
+                if (lengths.ContainsKey(key))
+                    throw new RailroadMapException("locked " + draft.A + " " + draft.B + " already has a track.");
+                AddTrack(byId, lengths, draft.A, draft.B, draft.Length);
+                lockedTracks.Add(new LockedTrackDef(draft.A, draft.B, lengths[key], draft.Cost));
+            }
+
             var ids = new string[towns.Count];
             for (int i = 0; i < towns.Count; i++)
                 ids[i] = towns[i].Id;
@@ -129,7 +145,7 @@ namespace Knightworld.Core
                 keptLandmarks.Add(landmarks[i]);
             }
 
-            return new RailroadMap(title, start, speed, minHop, defs, keptLandmarks, lengths);
+            return new RailroadMap(title, start, speed, minHop, defs, keptLandmarks, lengths, lockedTracks);
         }
 
         private static void AddTrack(
@@ -192,6 +208,30 @@ namespace Knightworld.Core
             return track;
         }
 
+        private static LockedDraft ParseLocked(List<string> tokens)
+        {
+            Need(tokens, 4, "locked <id> <id> [length] <cost>");
+            if (tokens.Count > 5)
+                throw new RailroadMapException("Too many values. Use locked <id> <id> [length] <cost>.");
+            var locked = new LockedDraft
+            {
+                A = NormalizeId(tokens[1]),
+                B = NormalizeId(tokens[2])
+            };
+            if (tokens.Count == 4)
+            {
+                locked.Length = null;
+                locked.Cost = ParseCost(tokens[3]);
+            }
+            else
+            {
+                locked.Length = ParsePositive(tokens[3], "length");
+                locked.Cost = ParseCost(tokens[4]);
+            }
+
+            return locked;
+        }
+
         private static LandmarkDef ParseLandmark(List<string> tokens)
         {
             string kind = tokens[1].ToLowerInvariant();
@@ -204,6 +244,13 @@ namespace Knightworld.Core
         {
             if (tokens.Count < count)
                 throw new RailroadMapException("Expected " + usage + ".");
+        }
+
+        private static int ParseCost(string text)
+        {
+            if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int cost) || cost <= 0)
+                throw new RailroadMapException("cost must be a whole number greater than 0.");
+            return cost;
         }
 
         private static float ParsePositive(string text, string label)
@@ -305,6 +352,14 @@ namespace Knightworld.Core
             public string A;
             public string B;
             public float? Length;
+        }
+
+        private sealed class LockedDraft
+        {
+            public string A;
+            public string B;
+            public float? Length;
+            public int Cost;
         }
     }
 }

@@ -59,6 +59,7 @@ namespace Knightworld.Core
         public const int CarriageCost = 350;
         public const int CarriageSeats = 6;
         public const int MaxWaitingPerTown = 4;
+        public const int MoveSpawnChancePercent = 40;
         public static readonly string[] Names =
         {
             "Ada", "Bram", "Cora", "Dax", "Elia", "Flint", "Gita", "Holt", "Ines", "Joss",
@@ -75,6 +76,7 @@ namespace Knightworld.Core
         public string CurrentTownId { get; private set; }
         public List<Passenger> Onboard { get; } = new List<Passenger>();
         public Dictionary<string, List<Passenger>> Waiting { get; } = new Dictionary<string, List<Passenger>>();
+        private readonly HashSet<string> _unlocked = new HashSet<string>(StringComparer.Ordinal);
 
         public int FreeSeats => SeatCount - Onboard.Count;
         public int SeatUpgradesLeft => SeatUpgradeStock - SeatUpgradesBought;
@@ -112,6 +114,23 @@ namespace Knightworld.Core
             return TrySpawnAt(open[_random.NextInclusive(0, open.Count - 1)]);
         }
 
+        public int RollPassengersOnMove()
+        {
+            int spawned = 0;
+            for (int i = 0; i < RailroadGraph.Towns.Count; i++)
+            {
+                string id = RailroadGraph.Towns[i].Id;
+                if (id == CurrentTownId)
+                    continue;
+                if (_random.NextInclusive(1, 100) > MoveSpawnChancePercent)
+                    continue;
+                if (TrySpawnAt(id))
+                    spawned++;
+            }
+
+            return spawned;
+        }
+
         public bool TrySpawnAt(string townId)
         {
             if (!Waiting.ContainsKey(townId) || Waiting[townId].Count >= MaxWaitingPerTown)
@@ -145,6 +164,33 @@ namespace Knightworld.Core
             Score -= CarriageCost;
             SeatCount += CarriageSeats;
             CarriagesBought++;
+            return true;
+        }
+
+        public bool CanRide(string fromId, string toId)
+        {
+            if (!RailroadGraph.AreLinked(fromId, toId))
+                return false;
+            if (!RailroadGraph.IsLocked(fromId, toId))
+                return true;
+            return _unlocked.Contains(RailroadMap.TrackKey(fromId, toId));
+        }
+
+        public bool RouteOwned(string fromId, string toId)
+        {
+            return _unlocked.Contains(RailroadMap.TrackKey(fromId, toId));
+        }
+
+        public bool TryBuyRoute(string otherTownId)
+        {
+            var locked = RailroadGraph.LockedTrack(CurrentTownId, otherTownId);
+            if (locked == null)
+                return false;
+            string key = RailroadMap.TrackKey(locked.A, locked.B);
+            if (_unlocked.Contains(key) || Score < locked.Cost)
+                return false;
+            Score -= locked.Cost;
+            _unlocked.Add(key);
             return true;
         }
 

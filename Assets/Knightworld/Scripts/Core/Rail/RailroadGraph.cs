@@ -44,6 +44,12 @@ namespace Knightworld.Core
 
         public static bool AreLinked(string fromId, string toId) => Map.AreLinked(fromId, toId);
 
+        public static bool IsLocked(string fromId, string toId) => Map.IsLocked(fromId, toId);
+
+        public static LockedTrackDef LockedTrack(string fromId, string toId) => Map.LockedTrack(fromId, toId);
+
+        public static List<LockedTrackDef> LockedFrom(string townId) => Map.LockedFrom(townId);
+
         public static float Distance(string fromId, string toId) => Map.Distance(fromId, toId);
 
         public static float RouteDistance(IReadOnlyList<string> route) => Map.RouteDistance(route);
