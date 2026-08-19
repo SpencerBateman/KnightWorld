@@ -1,3 +1,4 @@
+using System;
 using Knightworld.Core;
 using NUnit.Framework;
 
@@ -54,7 +55,7 @@ namespace Knightworld.Tests
         }
 
         [Test]
-        public void NoHopTakesMoreThanFiveSeconds()
+        public void NoHopTakesMoreThanTwoMinutes()
         {
             foreach (var from in RailroadGraph.Towns)
             {
@@ -62,11 +63,47 @@ namespace Knightworld.Tests
                 {
                     float hop = RailroadGraph.TravelSeconds(RailroadGraph.Distance(from.Id, link));
                     Assert.LessOrEqual(hop, RailroadMap.MaxHopSeconds, from.Id + " to " + link);
-                    Assert.Greater(hop, 0f);
+                    Assert.GreaterOrEqual(hop, RailroadGraph.MinHopSeconds);
                 }
             }
 
             Assert.AreEqual(RailroadMap.MaxHopSeconds, RailroadGraph.TravelSeconds(1000f));
+        }
+
+        [Test]
+        public void TravelCountsWallClockTime()
+        {
+            var session = NewSession();
+            var depart = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+            Assert.IsTrue(session.TryDepart(RailroadGraph.Portmere, depart));
+            Assert.IsTrue(session.InTransit);
+            Assert.AreEqual(RailroadGraph.Millhaven, session.CurrentTownId);
+            float duration = session.TravelDurationSeconds;
+            Assert.GreaterOrEqual(duration, 20f);
+            Assert.LessOrEqual(duration, 120f);
+            Assert.AreEqual(duration - 10f, session.TravelRemainingSeconds(depart.AddSeconds(10f)), 0.02f);
+            Assert.IsFalse(session.FinishTravelIfDue(depart.AddSeconds(10f)));
+            Assert.IsTrue(session.FinishTravelIfDue(depart.AddSeconds(duration + 1f)));
+            Assert.IsFalse(session.InTransit);
+            Assert.AreEqual(RailroadGraph.Portmere, session.CurrentTownId);
+        }
+
+        [Test]
+        public void SaveRemembersATripAfterReload()
+        {
+            var session = NewSession();
+            session.Grant(40);
+            var depart = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+            Assert.IsTrue(session.TryDepart(RailroadGraph.Portmere, depart));
+            string text = RailSaveCodec.Write(session.Capture());
+            Assert.IsTrue(RailSaveCodec.TryRead(text, out var state));
+            var loaded = RailSession.FromSave(state);
+            Assert.IsTrue(loaded.InTransit);
+            Assert.AreEqual(40, loaded.Score);
+            Assert.AreEqual(RailroadGraph.Millhaven, loaded.CurrentTownId);
+            Assert.AreEqual(RailroadGraph.Portmere, loaded.TravelToId);
+            Assert.IsTrue(loaded.FinishTravelIfDue(depart.AddSeconds(loaded.TravelDurationSeconds + 2f)));
+            Assert.AreEqual(RailroadGraph.Portmere, loaded.CurrentTownId);
         }
 
         [Test]
@@ -107,6 +144,50 @@ locked sc hidden 5 100
             session.Arrive("sc");
             Assert.IsTrue(session.TryBuyRoute("hidden"));
             Assert.IsTrue(session.CanRide("sc", "hidden"));
+        }
+
+        [Test]
+        public void PassengersStayOnThePaidNetwork()
+        {
+            RailroadGraph.Use(RailroadMapParser.Parse(@"
+start sc
+town sc SanClemente
+town open Open
+town hidden Hidden
+track sc open 4
+locked sc hidden 5 100
+"));
+            var session = new RailSession(new SeededRandom(3), "sc");
+            Assert.IsTrue(session.IsAccessible("sc"));
+            Assert.IsTrue(session.IsAccessible("open"));
+            Assert.IsFalse(session.IsAccessible("hidden"));
+            Assert.IsFalse(session.TrySpawnAt("hidden"));
+            for (int i = 0; i < RailSession.MaxWaitingPerTown; i++)
+            {
+                Assert.IsTrue(session.TrySpawnAt("sc"));
+                Assert.AreNotEqual("hidden", session.Waiting["sc"][i].DestId);
+            }
+
+            session.Waiting["sc"].Clear();
+            session.SeedWaiting(2);
+            Assert.AreEqual(0, session.Waiting["hidden"].Count);
+            session.RollPassengersOnMove();
+            Assert.AreEqual(0, session.Waiting["hidden"].Count);
+
+            session.Grant(100);
+            Assert.IsTrue(session.TryBuyRoute("hidden"));
+            Assert.IsTrue(session.IsAccessible("hidden"));
+            Assert.IsTrue(session.TrySpawnAt("hidden"));
+            bool wantsHidden = false;
+            for (int i = 0; i < 12; i++)
+            {
+                session.Waiting["sc"].Clear();
+                Assert.IsTrue(session.TrySpawnAt("sc"));
+                if (session.Waiting["sc"][0].DestId == "hidden")
+                    wantsHidden = true;
+            }
+
+            Assert.IsTrue(wantsHidden);
         }
 
         [Test]

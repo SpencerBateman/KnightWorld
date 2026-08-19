@@ -5,9 +5,9 @@
 #
 #   title  <text>                 HUD name
 #   start  <townId>               where the train begins
-#   speed  <secondsPerDistance>   travel time per distance (default 0.25)
-#   minhop <seconds>              shortest one-track ride (default 1.5)
-#        Rides are also capped at 5 seconds.
+#   speed  <secondsPerDistance>   travel time per distance (default 6)
+#   minhop <seconds>              shortest one-track ride (default 20)
+#        Rides are capped at 120 seconds (2 minutes).
 #
 #   town <id> <name> [neighbors...]
 #        id    lowercase key, no spaces (letters, numbers, _ -)
@@ -35,8 +35,8 @@
 
 title The Local
 start tutorialIsland
-speed 0.25
-minhop 1.5
+speed 6
+minhop 20
 
 town tutorialIsland Tutorial1
 town outskirts Outskirts

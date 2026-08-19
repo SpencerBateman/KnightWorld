@@ -59,5 +59,8 @@ namespace Knightworld.Core
         public static float RouteTravelSeconds(IReadOnlyList<string> route) => Map.RouteTravelSeconds(route);
 
         public static List<string> FindRoute(string fromId, string toId) => Map.FindRoute(fromId, toId);
+
+        public static List<string> FindRoute(string fromId, string toId, Func<string, string, bool> canUse) =>
+            Map.FindRoute(fromId, toId, canUse);
     }
 }

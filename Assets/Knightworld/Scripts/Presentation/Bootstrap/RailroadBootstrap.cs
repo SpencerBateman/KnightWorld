@@ -14,12 +14,17 @@ namespace Knightworld.Bootstrap
         {
             LoadMap();
             RailroadMaterials.Ensure();
-            var session = new RailSession(new SeededRandom(randomSeed), RailroadGraph.StartTownId);
-            session.SeedWaiting(startingPassengersPerTown);
+            RailSession session;
+            if (!RailSaveStore.TryLoad(out session))
+            {
+                session = new RailSession(new SeededRandom(randomSeed), RailroadGraph.StartTownId);
+                session.SeedWaiting(startingPassengersPerTown);
+            }
 
             var root = new GameObject("Railroad").transform;
             var view = new RailroadView(root);
             view.Build();
+            RevealUnlocked(view, session);
             view.RefreshPassengers(session);
 
             var camera = Camera.main;
@@ -34,11 +39,13 @@ namespace Knightworld.Bootstrap
             var iso = camera.GetComponent<IsoCameraController>();
             if (iso == null)
                 iso = camera.gameObject.AddComponent<IsoCameraController>();
-            iso.Distance = Mathf.Clamp(view.Radius * 1.85f + 12f, 18f, 80f);
-            iso.MinDistance = 16f;
-            iso.MaxDistance = iso.Distance + 40f;
-            iso.Pitch = 52f;
-            iso.FocusImmediate(view.Center);
+            iso.Distance = 11f;
+            iso.MinDistance = 6f;
+            iso.MaxDistance = 32f;
+            iso.Pitch = 48f;
+            iso.FollowLerp = 10f;
+            iso.IgnorePan = true;
+            iso.FocusImmediate(view.Train.position);
             view.ApplyCamera(camera);
 
             var hud = RailroadHud.Create();
@@ -63,6 +70,16 @@ namespace Knightworld.Bootstrap
             {
                 Debug.LogError("Railroad map failed to load: " + ex.Message);
                 RailroadGraph.UseDefault();
+            }
+        }
+
+        private static void RevealUnlocked(RailroadView view, RailSession session)
+        {
+            foreach (var key in session.UnlockedKeys)
+            {
+                if (!RailroadMap.SplitTrackKey(key, out string a, out string b))
+                    continue;
+                view.UnlockTrack(a, b);
             }
         }
     }

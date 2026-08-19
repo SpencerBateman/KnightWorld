@@ -69,7 +69,7 @@ namespace Knightworld.Core
         private readonly Dictionary<string, float> _trackLength = new Dictionary<string, float>(StringComparer.Ordinal);
         private readonly Dictionary<string, LockedTrackDef> _locked = new Dictionary<string, LockedTrackDef>(StringComparer.Ordinal);
 
-        public const float MaxHopSeconds = 5f;
+        public const float MaxHopSeconds = 120f;
 
         public string Title { get; }
         public string StartTownId { get; }
@@ -211,6 +211,11 @@ namespace Knightworld.Core
 
         public List<string> FindRoute(string fromId, string toId)
         {
+            return FindRoute(fromId, toId, null);
+        }
+
+        public List<string> FindRoute(string fromId, string toId, Func<string, string, bool> canUse)
+        {
             if (fromId == toId)
                 return new List<string> { fromId };
 
@@ -250,6 +255,8 @@ namespace Knightworld.Core
                     string next = town.Links[i];
                     if (!dist.ContainsKey(next))
                         continue;
+                    if (canUse != null && !canUse(current, next))
+                        continue;
                     float alt = dist[current] + Distance(current, next);
                     if (alt >= dist[next])
                         continue;
@@ -277,6 +284,20 @@ namespace Knightworld.Core
         public static string TrackKey(string a, string b)
         {
             return string.CompareOrdinal(a, b) < 0 ? a + "|" + b : b + "|" + a;
+        }
+
+        public static bool SplitTrackKey(string key, out string a, out string b)
+        {
+            a = "";
+            b = "";
+            if (string.IsNullOrEmpty(key))
+                return false;
+            int split = key.IndexOf('|');
+            if (split <= 0 || split >= key.Length - 1)
+                return false;
+            a = key.Substring(0, split);
+            b = key.Substring(split + 1);
+            return true;
         }
     }
 }

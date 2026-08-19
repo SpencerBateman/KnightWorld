@@ -16,6 +16,7 @@ namespace Knightworld.Presentation
         public float RotateSpeed = 180f;
         public float FollowLerp = 6f;
         public bool InputLocked;
+        public bool IgnorePan;
 
         private float _targetYaw;
         private Vector3 _followTarget;
@@ -69,18 +70,21 @@ namespace Knightworld.Presentation
             var keyboard = Keyboard.current;
             if (keyboard != null)
             {
-                Vector2 move = Vector2.zero;
-                if (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed) move.y += 1f;
-                if (keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed) move.y -= 1f;
-                if (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed) move.x += 1f;
-                if (keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed) move.x -= 1f;
-                if (move.sqrMagnitude > 0f)
+                if (!IgnorePan)
                 {
-                    move.Normalize();
-                    var yawRotation = Quaternion.Euler(0f, Yaw, 0f);
-                    var right = yawRotation * Vector3.right;
-                    var forward = yawRotation * Vector3.forward;
-                    _followTarget += (right * move.x + forward * move.y) * (PanSpeed * Time.deltaTime);
+                    Vector2 move = Vector2.zero;
+                    if (keyboard.wKey.isPressed || keyboard.upArrowKey.isPressed) move.y += 1f;
+                    if (keyboard.sKey.isPressed || keyboard.downArrowKey.isPressed) move.y -= 1f;
+                    if (keyboard.dKey.isPressed || keyboard.rightArrowKey.isPressed) move.x += 1f;
+                    if (keyboard.aKey.isPressed || keyboard.leftArrowKey.isPressed) move.x -= 1f;
+                    if (move.sqrMagnitude > 0f)
+                    {
+                        move.Normalize();
+                        var yawRotation = Quaternion.Euler(0f, Yaw, 0f);
+                        var right = yawRotation * Vector3.right;
+                        var forward = yawRotation * Vector3.forward;
+                        _followTarget += (right * move.x + forward * move.y) * (PanSpeed * Time.deltaTime);
+                    }
                 }
 
                 if (keyboard.qKey.wasPressedThisFrame)

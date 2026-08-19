@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using Knightworld.Core;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -8,6 +10,11 @@ namespace Knightworld.Presentation
 {
     public sealed class RailroadHud : MonoBehaviour
     {
+        private const string ResetLabel = "Reset data";
+        private const string ResetConfirmLabel = "Confirm reset";
+
+        public event Action ResetClicked;
+
         private Text _title;
         private Text _status;
         private Text _cargo;
@@ -17,6 +24,10 @@ namespace Knightworld.Presentation
         private Text _travelTitle;
         private Text _travelTimer;
         private Text _travelSub;
+        private RectTransform _resetButton;
+        private Text _resetLabel;
+        private Coroutine _resetArm;
+        private bool _resetArmed;
 
         public RailroadStationScreen Station { get; private set; }
         public RailroadShopScreen Shop { get; private set; }
@@ -42,6 +53,7 @@ namespace Knightworld.Presentation
             hud.Build();
             hud.Station = RailroadStationScreen.Create(canvasGo.transform);
             hud.Shop = RailroadShopScreen.Create(canvasGo.transform);
+            hud.BuildResetButton();
             return hud;
         }
 
@@ -132,6 +144,66 @@ namespace Knightworld.Presentation
             arriving.text = "until arrival";
             arriving.alignment = TextAnchor.MiddleCenter;
             _travelHud.SetActive(false);
+        }
+
+        private void LateUpdate()
+        {
+            if (_resetButton != null)
+                _resetButton.SetAsLastSibling();
+        }
+
+        private void BuildResetButton()
+        {
+            var go = new GameObject("ResetData", typeof(RectTransform));
+            _resetButton = go.GetComponent<RectTransform>();
+            _resetButton.SetParent(transform, false);
+            _resetButton.anchorMin = new Vector2(1f, 1f);
+            _resetButton.anchorMax = new Vector2(1f, 1f);
+            _resetButton.pivot = new Vector2(1f, 1f);
+            _resetButton.anchoredPosition = new Vector2(-20f, -16f);
+            _resetButton.sizeDelta = new Vector2(188f, 40f);
+            var image = go.AddComponent<Image>();
+            image.color = new Color(0.22f, 0.16f, 0.16f, 0.88f);
+            var button = go.AddComponent<Button>();
+            button.onClick.AddListener(OnResetClicked);
+            var textGo = new GameObject("Label", typeof(RectTransform));
+            var textRect = textGo.GetComponent<RectTransform>();
+            textRect.SetParent(_resetButton, false);
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+            _resetLabel = textGo.AddComponent<Text>();
+            _resetLabel.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
+                               ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
+            _resetLabel.fontSize = 18;
+            _resetLabel.alignment = TextAnchor.MiddleCenter;
+            _resetLabel.color = new Color(0.92f, 0.84f, 0.84f);
+            _resetLabel.text = ResetLabel;
+        }
+
+        private void OnResetClicked()
+        {
+            if (_resetArmed)
+            {
+                ResetClicked?.Invoke();
+                return;
+            }
+
+            _resetArmed = true;
+            _resetLabel.text = ResetConfirmLabel;
+            if (_resetArm != null)
+                StopCoroutine(_resetArm);
+            _resetArm = StartCoroutine(DisarmReset());
+        }
+
+        private IEnumerator DisarmReset()
+        {
+            yield return new WaitForSecondsRealtime(3f);
+            _resetArmed = false;
+            if (_resetLabel != null)
+                _resetLabel.text = ResetLabel;
+            _resetArm = null;
         }
 
         private GameObject Layer(string name)

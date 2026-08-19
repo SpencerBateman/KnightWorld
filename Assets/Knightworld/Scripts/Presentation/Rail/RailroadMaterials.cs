@@ -182,6 +182,7 @@ namespace Knightworld.Presentation
                          ?? Shader.Find("Sprites/Default")
                          ?? Shader.Find("Hidden/InternalErrorShader");
             var material = new Material(shader) { color = color };
+            material.enableInstancing = true;
             if (material.HasProperty("_BaseColor"))
                 material.SetColor("_BaseColor", color);
             if (material.HasProperty("_Color"))

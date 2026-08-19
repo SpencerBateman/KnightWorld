@@ -12,18 +12,29 @@ namespace Knightworld.Core
         public int Fare { get; private set; }
 
         public Passenger(int id, string name, string originId, string destId)
+            : this(id, name, originId, destId, FareBetween(originId, destId))
+        {
+        }
+
+        public Passenger(int id, string name, string originId, string destId, int fare)
         {
             Id = id;
             Name = name;
             OriginId = originId;
             DestId = destId;
-            Fare = FareBetween(originId, destId);
+            Fare = fare < 1 ? 1 : fare;
         }
 
         public void Relocate(string townId)
         {
             OriginId = townId;
             Fare = FareBetween(townId, DestId);
+        }
+
+        public void Relocate(string townId, int fare)
+        {
+            OriginId = townId;
+            Fare = fare < 1 ? 1 : fare;
         }
 
         public static int FareBetween(string fromId, string toId)
@@ -67,6 +78,7 @@ namespace Knightworld.Core
         };
 
         private readonly IRandom _random;
+        private readonly SeededRandom _seeded;
         private int _nextPassengerId = 1;
 
         public int Score { get; private set; }
@@ -74,6 +86,10 @@ namespace Knightworld.Core
         public int SeatUpgradesBought { get; private set; }
         public int CarriagesBought { get; private set; }
         public string CurrentTownId { get; private set; }
+        public string TravelFromId { get; private set; }
+        public string TravelToId { get; private set; }
+        public long TravelDepartUtcTicks { get; private set; }
+        public float TravelDurationSeconds { get; private set; }
         public List<Passenger> Onboard { get; } = new List<Passenger>();
         public Dictionary<string, List<Passenger>> Waiting { get; } = new Dictionary<string, List<Passenger>>();
         private readonly HashSet<string> _unlocked = new HashSet<string>(StringComparer.Ordinal);
@@ -81,10 +97,13 @@ namespace Knightworld.Core
         public int FreeSeats => SeatCount - Onboard.Count;
         public int SeatUpgradesLeft => SeatUpgradeStock - SeatUpgradesBought;
         public bool HasCarriage => CarriagesBought > 0;
+        public bool InTransit => !string.IsNullOrEmpty(TravelToId);
+        public IReadOnlyCollection<string> UnlockedKeys => _unlocked;
 
         public RailSession(IRandom random, string startTownId)
         {
-            _random = random;
+            _random = random ?? new SeededRandom(11);
+            _seeded = _random as SeededRandom;
             CurrentTownId = startTownId;
             for (int i = 0; i < RailroadGraph.Towns.Count; i++)
                 Waiting[RailroadGraph.Towns[i].Id] = new List<Passenger>();
@@ -94,6 +113,8 @@ namespace Knightworld.Core
         {
             for (int t = 0; t < RailroadGraph.Towns.Count; t++)
             {
+                if (!IsAccessible(RailroadGraph.Towns[t].Id))
+                    continue;
                 for (int n = 0; n < perTown; n++)
                     TrySpawnAt(RailroadGraph.Towns[t].Id);
             }
@@ -105,8 +126,9 @@ namespace Knightworld.Core
             for (int i = 0; i < RailroadGraph.Towns.Count; i++)
             {
                 string id = RailroadGraph.Towns[i].Id;
-                if (Waiting[id].Count < MaxWaitingPerTown)
-                    open.Add(id);
+                if (!IsAccessible(id) || Waiting[id].Count >= MaxWaitingPerTown)
+                    continue;
+                open.Add(id);
             }
 
             if (open.Count == 0)
@@ -120,7 +142,7 @@ namespace Knightworld.Core
             for (int i = 0; i < RailroadGraph.Towns.Count; i++)
             {
                 string id = RailroadGraph.Towns[i].Id;
-                if (id == CurrentTownId)
+                if (id == CurrentTownId || !IsAccessible(id))
                     continue;
                 if (_random.NextInclusive(1, 100) > MoveSpawnChancePercent)
                     continue;
@@ -135,9 +157,13 @@ namespace Knightworld.Core
         {
             if (!Waiting.ContainsKey(townId) || Waiting[townId].Count >= MaxWaitingPerTown)
                 return false;
-            string dest = RandomOtherTown(townId);
+            if (!IsAccessible(townId))
+                return false;
+            string dest = RandomAccessibleTown(townId);
+            if (dest == null)
+                return false;
             string name = Names[_random.NextInclusive(0, Names.Length - 1)];
-            Waiting[townId].Add(new Passenger(_nextPassengerId++, name, townId, dest));
+            Waiting[townId].Add(new Passenger(_nextPassengerId++, name, townId, dest, OpenFare(townId, dest)));
             return true;
         }
 
@@ -197,6 +223,71 @@ namespace Knightworld.Core
         public void Arrive(string townId)
         {
             CurrentTownId = townId;
+            ClearTrip();
+        }
+
+        public bool TryDepart(string toId, DateTime utcNow)
+        {
+            if (InTransit || string.IsNullOrEmpty(toId) || !CanRide(CurrentTownId, toId))
+                return false;
+            RollPassengersOnMove();
+            TravelFromId = CurrentTownId;
+            TravelToId = toId;
+            TravelDepartUtcTicks = utcNow.Kind == DateTimeKind.Utc ? utcNow.Ticks : utcNow.ToUniversalTime().Ticks;
+            TravelDurationSeconds = RailroadGraph.TravelSeconds(RailroadGraph.Distance(CurrentTownId, toId));
+            return true;
+        }
+
+        public float TravelElapsedSeconds(DateTime utcNow)
+        {
+            if (!InTransit)
+                return 0f;
+            long now = utcNow.Kind == DateTimeKind.Utc ? utcNow.Ticks : utcNow.ToUniversalTime().Ticks;
+            double elapsed = (now - TravelDepartUtcTicks) / (double)TimeSpan.TicksPerSecond;
+            if (elapsed < 0d)
+                return 0f;
+            return (float)elapsed;
+        }
+
+        public float TravelRemainingSeconds(DateTime utcNow)
+        {
+            if (!InTransit)
+                return 0f;
+            float left = TravelDurationSeconds - TravelElapsedSeconds(utcNow);
+            return left < 0f ? 0f : left;
+        }
+
+        public float TravelProgress(DateTime utcNow)
+        {
+            if (!InTransit)
+                return 0f;
+            if (TravelDurationSeconds <= 0.001f)
+                return 1f;
+            float t = TravelElapsedSeconds(utcNow) / TravelDurationSeconds;
+            if (t < 0f)
+                return 0f;
+            if (t > 1f)
+                return 1f;
+            return t;
+        }
+
+        public bool FinishTravelIfDue(DateTime utcNow)
+        {
+            if (!InTransit)
+                return false;
+            if (TravelRemainingSeconds(utcNow) > 0f)
+                return false;
+            string dest = TravelToId;
+            Arrive(dest);
+            return true;
+        }
+
+        private void ClearTrip()
+        {
+            TravelFromId = null;
+            TravelToId = null;
+            TravelDepartUtcTicks = 0L;
+            TravelDurationSeconds = 0f;
         }
 
         public bool TryAlight(int passengerId, out bool scored)
@@ -215,7 +306,7 @@ namespace Knightworld.Core
                 }
                 else
                 {
-                    person.Relocate(CurrentTownId);
+                    person.Relocate(CurrentTownId, OpenFare(CurrentTownId, person.DestId));
                     Waiting[CurrentTownId].Add(person);
                 }
                 return true;
@@ -328,19 +419,148 @@ namespace Knightworld.Core
             return tallies;
         }
 
-        private string RandomOtherTown(string originId)
+        public bool IsAccessible(string townId)
         {
-            int index = _random.NextInclusive(0, RailroadGraph.Towns.Count - 2);
-            for (int i = 0; i < RailroadGraph.Towns.Count; i++)
+            if (string.IsNullOrEmpty(townId))
+                return false;
+            var reachable = AccessibleTowns();
+            for (int i = 0; i < reachable.Count; i++)
             {
-                if (RailroadGraph.Towns[i].Id == originId)
-                    continue;
-                if (index == 0)
-                    return RailroadGraph.Towns[i].Id;
-                index--;
+                if (reachable[i] == townId)
+                    return true;
             }
 
-            return RailroadGraph.Towns[0].Id;
+            return false;
+        }
+
+        public List<string> AccessibleTowns()
+        {
+            var found = new List<string>();
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            string start = RailroadGraph.StartTownId;
+            if (string.IsNullOrEmpty(start))
+                start = CurrentTownId;
+            seen.Add(start);
+            found.Add(start);
+            for (int i = 0; i < found.Count; i++)
+            {
+                var town = RailroadGraph.Get(found[i]);
+                for (int n = 0; n < town.Links.Count; n++)
+                {
+                    string next = town.Links[n];
+                    if (seen.Contains(next) || !CanRide(found[i], next))
+                        continue;
+                    seen.Add(next);
+                    found.Add(next);
+                }
+            }
+
+            return found;
+        }
+
+        private int OpenFare(string fromId, string toId)
+        {
+            if (fromId == toId)
+                return 1;
+            var route = RailroadGraph.FindRoute(fromId, toId, CanRide);
+            if (route == null)
+                return 1;
+            int fare = (int)Math.Round(RailroadGraph.RouteDistance(route));
+            return fare < 1 ? 1 : fare;
+        }
+
+        private string RandomAccessibleTown(string originId)
+        {
+            var choices = new List<string>();
+            var reachable = AccessibleTowns();
+            for (int i = 0; i < reachable.Count; i++)
+            {
+                if (reachable[i] != originId)
+                    choices.Add(reachable[i]);
+            }
+
+            if (choices.Count == 0)
+                return null;
+            return choices[_random.NextInclusive(0, choices.Count - 1)];
+        }
+
+        public RailSaveState Capture()
+        {
+            var state = new RailSaveState
+            {
+                MapTitle = RailroadGraph.Map != null ? RailroadGraph.Map.Title : "",
+                StartTownId = RailroadGraph.StartTownId,
+                SeedState = _seeded != null ? _seeded.State : 0,
+                Score = Score,
+                SeatCount = SeatCount,
+                SeatUpgradesBought = SeatUpgradesBought,
+                CarriagesBought = CarriagesBought,
+                NextPassengerId = _nextPassengerId,
+                CurrentTownId = CurrentTownId,
+                TravelFromId = TravelFromId ?? "",
+                TravelToId = TravelToId ?? "",
+                TravelDepartUtcTicks = TravelDepartUtcTicks,
+                TravelDurationSeconds = TravelDurationSeconds
+            };
+            foreach (var key in _unlocked)
+                state.Unlocked.Add(key);
+            for (int i = 0; i < Onboard.Count; i++)
+                state.Onboard.Add(RailSaveState.FromPassenger(Onboard[i]));
+            foreach (var pair in Waiting)
+            {
+                for (int i = 0; i < pair.Value.Count; i++)
+                    state.Waiting.Add(RailSaveState.FromPassenger(pair.Value[i]));
+            }
+
+            return state;
+        }
+
+        public static RailSession FromSave(RailSaveState state)
+        {
+            var rng = new SeededRandom(state != null && state.SeedState != 0 ? state.SeedState : 11);
+            if (state != null && state.SeedState != 0)
+                rng.Restore(state.SeedState);
+            string town = state != null && !string.IsNullOrEmpty(state.CurrentTownId)
+                ? state.CurrentTownId
+                : RailroadGraph.StartTownId;
+            var session = new RailSession(rng, town);
+            if (state == null)
+                return session;
+            session.Score = state.Score;
+            session.SeatCount = state.SeatCount < StartingSeats ? StartingSeats : state.SeatCount;
+            session.SeatUpgradesBought = state.SeatUpgradesBought;
+            session.CarriagesBought = state.CarriagesBought;
+            session._nextPassengerId = state.NextPassengerId < 1 ? 1 : state.NextPassengerId;
+            for (int i = 0; i < state.Unlocked.Count; i++)
+            {
+                if (!string.IsNullOrEmpty(state.Unlocked[i]))
+                    session._unlocked.Add(state.Unlocked[i]);
+            }
+
+            for (int i = 0; i < state.Onboard.Count; i++)
+            {
+                var person = state.Onboard[i].ToPassenger();
+                if (person != null)
+                    session.Onboard.Add(person);
+            }
+
+            for (int i = 0; i < state.Waiting.Count; i++)
+            {
+                var person = state.Waiting[i].ToPassenger();
+                if (person == null || !session.Waiting.ContainsKey(person.OriginId))
+                    continue;
+                session.Waiting[person.OriginId].Add(person);
+            }
+
+            if (!string.IsNullOrEmpty(state.TravelToId))
+            {
+                session.TravelFromId = string.IsNullOrEmpty(state.TravelFromId) ? town : state.TravelFromId;
+                session.TravelToId = state.TravelToId;
+                session.TravelDepartUtcTicks = state.TravelDepartUtcTicks;
+                session.TravelDurationSeconds = state.TravelDurationSeconds;
+            }
+
+            return session;
         }
     }
 }

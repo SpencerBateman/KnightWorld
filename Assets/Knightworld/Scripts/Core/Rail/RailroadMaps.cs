@@ -5,8 +5,8 @@ namespace Knightworld.Core
         public const string TheLocal =
 @"title The Local
 start millhaven
-speed 0.25
-minhop 1.5
+speed 6
+minhop 20
 
 town millhaven Millhaven
 town lakeside Lakeside

@@ -67,6 +67,24 @@ track west east 50
         }
 
         [Test]
+        public void HopTimeIsClampedBetweenTwentySecondsAndTwoMinutes()
+        {
+            var map = RailroadMapParser.Parse(@"
+start a
+town a A
+town b B
+town c C
+track a b 1
+track b c 40
+");
+            Assert.AreEqual(20f, map.MinHopSeconds);
+            Assert.AreEqual(6f, map.SecondsPerDistance);
+            Assert.AreEqual(20f, map.TravelSeconds(1f));
+            Assert.AreEqual(48f, map.TravelSeconds(8f));
+            Assert.AreEqual(RailroadMap.MaxHopSeconds, map.TravelSeconds(40f));
+        }
+
+        [Test]
         public void LongerTracksSitFartherApart()
         {
             var map = RailroadMapParser.Parse(@"

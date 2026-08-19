@@ -1,8 +1,10 @@
+using System;
 using System.Collections;
 using Knightworld.Core;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 namespace Knightworld.Presentation
 {
@@ -16,7 +18,9 @@ namespace Knightworld.Presentation
         private RailroadStationScreen _station;
         private RailroadShopScreen _shop;
         private Camera _camera;
+        private IsoCameraController _iso;
         private bool _busy;
+        private bool _saveSuppressed;
         private string _banner;
 
         public void Initialize(RailSession session, RailroadView view, RailroadHud hud, Camera worldCamera)
@@ -27,6 +31,7 @@ namespace Knightworld.Presentation
             _station = hud.Station;
             _shop = hud.Shop;
             _camera = worldCamera;
+            _iso = worldCamera != null ? worldCamera.GetComponent<IsoCameraController>() : null;
             _station.BoardClicked += OnBoard;
             _station.AlightClicked += OnAlight;
             _station.DepartClicked += OnDepart;
@@ -35,9 +40,28 @@ namespace Knightworld.Presentation
             _shop.BuySeatClicked += OnBuySeat;
             _shop.BuyCarriageClicked += OnBuyCarriage;
             _shop.BackClicked += OnShopBack;
+            _hud.ResetClicked += OnResetPlayerData;
             _view.RefreshPassengers(_session);
             _hud.Refresh(_session, null);
-            OpenStation("Click a traveler to add them. Click a passenger to drop them off.");
+            DateTime now = DateTime.UtcNow;
+            if (_session.FinishTravelIfDue(now))
+            {
+                Save();
+                _view.SnapTrain(_session.CurrentTownId);
+                _view.RefreshPassengers(_session);
+                OpenStation("Arrived at " + RailroadGraph.Get(_session.CurrentTownId).Name + ". Board travelers, drop passengers, or visit the shop.");
+            }
+            else if (_session.InTransit)
+            {
+                StartCoroutine(Ride(_session.TravelFromId, _session.TravelToId));
+            }
+            else
+            {
+                _view.SnapTrain(_session.CurrentTownId);
+                OpenStation("Click a traveler to add them. Click a passenger to drop them off.");
+            }
+
+            SnapCameraToTrain();
         }
 
         private bool UiOpen => (_station != null && _station.IsOpen) || (_shop != null && _shop.IsOpen);
@@ -59,12 +83,46 @@ namespace Knightworld.Presentation
                 _shop.BuyCarriageClicked -= OnBuyCarriage;
                 _shop.BackClicked -= OnShopBack;
             }
+
+            if (_hud != null)
+                _hud.ResetClicked -= OnResetPlayerData;
+
+            Save();
+        }
+
+        private void OnApplicationPause(bool paused)
+        {
+            if (paused)
+                Save();
+        }
+
+        private void OnApplicationQuit()
+        {
+            Save();
+        }
+
+        private void Save()
+        {
+            if (_saveSuppressed || _session == null)
+                return;
+            RailSaveStore.Write(_session);
+        }
+
+        private void OnResetPlayerData()
+        {
+            _saveSuppressed = true;
+            StopAllCoroutines();
+            _busy = false;
+            _session = null;
+            RailSaveStore.Clear();
+            SceneManager.LoadScene(gameObject.scene.name);
         }
 
         private void Update()
         {
             if (_view == null || _session == null)
                 return;
+            FollowTrain();
             _view.FaceLabels(_camera);
             if (_busy || UiOpen)
                 return;
@@ -98,6 +156,7 @@ namespace Knightworld.Presentation
                 _view.RefreshPassengers(_session);
                 _hud.Refresh(_session, _banner);
                 _station.Refresh(_banner);
+                Save();
                 return;
             }
 
@@ -123,6 +182,7 @@ namespace Knightworld.Presentation
             _station.Refresh(_banner);
             if (scored)
                 _station.PlayScoreBurst(fare);
+            Save();
         }
 
         private void OnOpenShop()
@@ -175,6 +235,7 @@ namespace Knightworld.Presentation
             _shop.Refresh(_banner);
             if (_station.IsOpen)
                 _station.Refresh(_banner);
+            Save();
         }
 
         private void OnShopBack()
@@ -196,6 +257,7 @@ namespace Knightworld.Presentation
                 _view.RefreshPassengers(_session);
                 _hud.Refresh(_session, _banner);
                 _station.Refresh(_banner);
+                Save();
                 return;
             }
 
@@ -278,7 +340,19 @@ namespace Knightworld.Presentation
         {
             _busy = true;
             _hud.SetTooltip("");
-            _session.RollPassengersOnMove();
+            if (!_session.InTransit)
+            {
+                if (!_session.TryDepart(toId, DateTime.UtcNow))
+                {
+                    _busy = false;
+                    yield break;
+                }
+
+                Save();
+            }
+
+            fromId = _session.TravelFromId;
+            toId = _session.TravelToId;
             _view.RefreshPassengers(_session);
             var fromTown = RailroadGraph.Get(fromId);
             var toTown = RailroadGraph.Get(toId);
@@ -289,39 +363,56 @@ namespace Knightworld.Presentation
             if (delta.sqrMagnitude > 0.0001f)
                 _view.Train.rotation = Quaternion.LookRotation(delta);
 
-            float hopSeconds = RailroadGraph.TravelSeconds(RailroadGraph.Distance(fromId, toId));
-            var iso = _camera != null ? _camera.GetComponent<IsoCameraController>() : null;
+            var iso = _iso;
             if (iso != null)
-                iso.FrameRoute(from, to);
+                iso.Follow(from);
             _hud.BeginTravel(fromTown.Name, toTown.Name);
-            _hud.SetTravelRemaining(hopSeconds);
+            PlaceTrainAlongTrip(from, to);
 
-            float elapsed = 0f;
-            while (elapsed < hopSeconds)
+            while (_session.InTransit && _session.TravelRemainingSeconds(DateTime.UtcNow) > 0.02f)
             {
-                elapsed += Time.deltaTime;
-                float remaining = hopSeconds - elapsed;
-                _hud.SetTravelRemaining(remaining);
-                float t = Mathf.Clamp01(elapsed / hopSeconds);
-                t = t * t * (3f - 2f * t);
-                _view.Train.position = Vector3.Lerp(from, to, t);
-                if (iso != null)
-                    iso.Follow(_view.Train.position);
+                PlaceTrainAlongTrip(from, to);
                 yield return null;
             }
 
             _view.Train.position = to;
             _hud.EndTravel();
-            if (iso != null)
-                iso.UnlockOn(to);
+            SnapCameraToTrain();
 
-            _session.Arrive(toId);
+            _session.FinishTravelIfDue(DateTime.UtcNow);
+            if (_session.InTransit)
+                _session.Arrive(toId);
             _view.SnapTrain(_session.CurrentTownId);
             _view.RefreshPassengers(_session);
             _banner = "Arrived at " + toTown.Name + ".";
             _hud.Refresh(_session, _banner);
             _busy = false;
+            Save();
             OpenStation($"Arrived at {toTown.Name}. Board travelers, drop passengers, or visit the shop.");
+        }
+
+        private void PlaceTrainAlongTrip(Vector3 from, Vector3 to)
+        {
+            float remaining = _session.TravelRemainingSeconds(DateTime.UtcNow);
+            _hud.SetTravelRemaining(remaining);
+            float t = _session.TravelProgress(DateTime.UtcNow);
+            t = t * t * (3f - 2f * t);
+            _view.Train.position = Vector3.Lerp(from, to, t);
+            FollowTrain();
+        }
+
+        private void FollowTrain()
+        {
+            if (_iso == null || _view == null || _view.Train == null)
+                return;
+            _iso.Follow(_view.Train.position);
+        }
+
+        private void SnapCameraToTrain()
+        {
+            if (_iso == null || _view == null || _view.Train == null)
+                return;
+            _iso.FocusImmediate(_view.Train.position);
         }
 
         private bool TryPickTown(out string townId)

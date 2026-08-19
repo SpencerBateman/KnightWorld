@@ -46,13 +46,20 @@ namespace Knightworld.Presentation
                 return;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.62f, 0.78f, 0.92f);
-            camera.farClipPlane = Mathf.Max(camera.farClipPlane, _radius * 8f + 80f);
+            camera.farClipPlane = _radius * 3.2f + 36f;
+            camera.allowHDR = false;
+            camera.allowMSAA = false;
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.Linear;
             RenderSettings.fogColor = new Color(0.72f, 0.82f, 0.90f);
-            RenderSettings.fogStartDistance = _radius * 1.15f + 8f;
-            RenderSettings.fogEndDistance = _radius * 3.4f + 36f;
+            RenderSettings.fogStartDistance = _radius * 1.05f + 6f;
+            RenderSettings.fogEndDistance = _radius * 2.6f + 28f;
             RenderSettings.ambientLight = new Color(0.78f, 0.82f, 0.88f);
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
+            QualitySettings.shadows = ShadowQuality.Disable;
+            QualitySettings.antiAliasing = 0;
+            QualitySettings.pixelLightCount = 0;
+            QualitySettings.anisotropicFiltering = AnisotropicFiltering.Disable;
         }
 
         private void Collect(RailroadMap map)
@@ -181,7 +188,7 @@ namespace Knightworld.Presentation
 
         private void IslandWater(Vector3 town, Vector3 landBridge, TownVibe vibe)
         {
-            int lobes = 7;
+            int lobes = 5;
             for (int i = 0; i < lobes; i++)
             {
                 float t = i / (float)lobes;
@@ -252,17 +259,11 @@ namespace Knightworld.Presentation
             var pond = Prim(PrimitiveType.Cylinder, "Water", WorldLayers.Lift(flat, WorldLayers.WaterY(water), _waters.Count), new Vector3(width, WorldLayers.WaterHalf, depth), water);
             _waters.Add(flat);
             Prim(PrimitiveType.Cylinder, "Shallows", WorldLayers.Lift(flat, WorldLayers.Shore, _waters.Count), new Vector3(width * 1.18f, WorldLayers.ShoreHalf, depth * 1.18f), RailroadMaterials.Shore);
-            if (sheen > 0.3f)
-            {
-                var gleam = pond.AddComponent<WaterSheen>();
-                gleam.Phase = Rand(0f, 8f);
-                gleam.Amount = 0.012f + sheen * 0.012f;
-            }
         }
 
         private void PaintMountains()
         {
-            int rim = 7 + _towns.Count;
+            int rim = 5 + _towns.Count;
             for (int i = 0; i < rim; i++)
             {
                 float ang = (i / (float)rim) * Mathf.PI * 2f + Rand(-0.12f, 0.12f);
@@ -328,12 +329,12 @@ namespace Knightworld.Presentation
 
         private void PaintForests()
         {
-            int trees = 18 + _towns.Count * 10;
-            if (trees > 120)
-                trees = 120;
+            int trees = 12 + _towns.Count * 6;
+            if (trees > 64)
+                trees = 64;
             for (int i = 0; i < _towns.Count; i++)
             {
-                int grove = 6 + Mathf.RoundToInt(_vibes[i].Forest * 14f);
+                int grove = 4 + Mathf.RoundToInt(_vibes[i].Forest * 8f);
                 Vector3 origin = _towns[i];
                 Vector3 outward = Outward(origin);
                 for (int n = 0; n < grove; n++)
@@ -388,16 +389,15 @@ namespace Knightworld.Presentation
         {
             Prim(PrimitiveType.Cylinder, "Trunk", at + Vector3.up * (0.38f * scale), new Vector3(0.14f, 0.4f, 0.14f) * scale, RailroadMaterials.Trunk);
             Prim(PrimitiveType.Sphere, "PineLow", at + Vector3.up * (0.82f * scale), new Vector3(1.05f, 0.7f, 1.05f) * scale, RailroadMaterials.Pine);
-            Prim(PrimitiveType.Sphere, "PineMid", at + Vector3.up * (1.22f * scale), new Vector3(0.78f, 0.62f, 0.78f) * scale, RailroadMaterials.Pine);
-            Prim(PrimitiveType.Sphere, "PineTop", at + Vector3.up * (1.58f * scale), new Vector3(0.46f, 0.5f, 0.46f) * scale, RailroadMaterials.LeafDark);
+            Prim(PrimitiveType.Sphere, "PineTop", at + Vector3.up * (1.45f * scale), new Vector3(0.62f, 0.55f, 0.62f) * scale, RailroadMaterials.LeafDark);
         }
 
         private void Palm(Vector3 at, float scale)
         {
             Prim(PrimitiveType.Cylinder, "PalmTrunk", at + Vector3.up * (0.72f * scale), new Vector3(0.12f, 0.72f, 0.12f) * scale, RailroadMaterials.Trunk);
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < 3; i++)
             {
-                float ang = i / 5f * Mathf.PI * 2f;
+                float ang = i / 3f * Mathf.PI * 2f;
                 Vector3 dir = new Vector3(Mathf.Cos(ang), 0.15f, Mathf.Sin(ang));
                 var frond = Prim(PrimitiveType.Cube, "Frond", at + Vector3.up * (1.42f * scale) + dir * (0.45f * scale), new Vector3(0.18f, 0.06f, 0.85f) * scale, RailroadMaterials.Frond);
                 frond.transform.rotation = Quaternion.LookRotation(dir + Vector3.up * 0.2f);
@@ -406,9 +406,9 @@ namespace Knightworld.Presentation
 
         private void PaintRocks()
         {
-            int count = 14 + _towns.Count * 5;
-            if (count > 70)
-                count = 70;
+            int count = 10 + _towns.Count * 3;
+            if (count > 40)
+                count = 40;
             for (int i = 0; i < _towns.Count; i++)
             {
                 if (_vibes[i].Rock < 0.3f && _vibes[i].Mountain < 0.45f)
@@ -454,7 +454,7 @@ namespace Knightworld.Presentation
                 var puff = new GameObject("Cloud");
                 puff.transform.SetParent(_root, false);
                 puff.transform.position = at;
-                int blobs = 4 + Next(3);
+                int blobs = 3 + Next(2);
                 for (int b = 0; b < blobs; b++)
                 {
                     Vector3 offset = new Vector3(Rand(-1.4f, 1.4f), Rand(-0.25f, 0.35f), Rand(-0.9f, 0.9f));
@@ -556,14 +556,7 @@ namespace Knightworld.Presentation
 
         private GameObject Prim(PrimitiveType type, string name, Vector3 pos, Vector3 scale, Material material, Transform parent = null)
         {
-            var go = GameObject.CreatePrimitive(type);
-            go.name = name;
-            go.transform.SetParent(parent != null ? parent : _root, false);
-            go.transform.position = pos;
-            go.transform.localScale = scale;
-            go.GetComponent<Renderer>().sharedMaterial = material;
-            UnityEngine.Object.Destroy(go.GetComponent<Collider>());
-            return go;
+            return LowPoly.Spawn(type, name, pos, scale, material, parent != null ? parent : _root);
         }
 
         private float Rand01()

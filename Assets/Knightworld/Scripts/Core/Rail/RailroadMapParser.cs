@@ -20,8 +20,8 @@ namespace Knightworld.Core
 
             string title = "";
             string start = "";
-            float speed = 0.25f;
-            float minHop = 1.5f;
+            float speed = 6f;
+            float minHop = 20f;
             var towns = new List<TownDraft>();
             var tracks = new List<TrackDraft>();
             var locked = new List<LockedDraft>();
