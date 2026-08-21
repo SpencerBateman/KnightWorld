@@ -444,6 +444,75 @@ locked sc hidden 5 100
             Assert.Less(waiting.Fare, original);
         }
 
+        [Test]
+        public void QuestPassengerSpawnsWhenRouteIsCompletable()
+        {
+            RailroadGraph.Use(RailroadMapParser.Parse(@"
+start sc
+town sc SanClemente
+town ny NewYork
+track sc ny 4
+quest Spencer sc ny 100
+"));
+            var session = new RailSession(new SeededRandom(1), "sc");
+            Assert.IsTrue(session.EnsureQuestPassenger());
+            Assert.IsTrue(session.HasQuestPassenger());
+            Assert.AreEqual(1, session.Waiting["sc"].Count);
+            Assert.AreEqual("Spencer", session.Waiting["sc"][0].Name);
+            Assert.IsTrue(session.Waiting["sc"][0].IsQuest);
+            Assert.AreEqual(100, session.Waiting["sc"][0].Fare);
+            Assert.IsFalse(session.EnsureQuestPassenger());
+        }
+
+        [Test]
+        public void QuestPassengerWaitsUntilRouteIsCompletable()
+        {
+            RailroadGraph.Use(RailroadMapParser.Parse(@"
+start sc
+town sc SanClemente
+town ny NewYork
+town hidden Hidden
+lock sc ny 4 50
+track sc hidden 4
+quest Spencer sc ny 100
+"));
+            var session = new RailSession(new SeededRandom(1), "sc");
+            Assert.IsFalse(session.EnsureQuestPassenger());
+            Assert.IsFalse(session.HasQuestPassenger());
+            session.Grant(50);
+            Assert.IsTrue(session.TryBuyRoute("ny"));
+            Assert.IsTrue(session.EnsureQuestPassenger());
+            Assert.AreEqual("Spencer", session.Waiting["sc"][0].Name);
+        }
+
+        [Test]
+        public void CompletingAQuestMarksItDoneAndSpawnsTheNextOne()
+        {
+            RailroadGraph.Use(RailroadMapParser.Parse(@"
+start hub
+town hub Hub
+town east East
+town west West
+track hub east 4
+track hub west 4
+quest Ada hub east 40
+quest Bram hub west 60
+"));
+            var session = new RailSession(new SeededRandom(1), "hub");
+            Assert.IsTrue(session.EnsureQuestPassenger());
+            Assert.AreEqual("Ada", session.Waiting["hub"][0].Name);
+            int adaId = session.Waiting["hub"][0].Id;
+            Assert.IsTrue(session.TryBoard(adaId));
+            session.Arrive("east");
+            Assert.IsTrue(session.TryAlight(adaId, out bool scored));
+            Assert.IsTrue(scored);
+            Assert.AreEqual(40, session.Score);
+            Assert.IsFalse(session.HasQuestPassenger());
+            Assert.IsTrue(session.EnsureQuestPassenger());
+            Assert.AreEqual("Bram", session.Waiting["hub"][0].Name);
+            Assert.IsFalse(session.EnsureQuestPassenger());
+        }
+
         private static RailSession NewSession()
         {
             return new RailSession(new SeededRandom(7), RailroadGraph.Millhaven);

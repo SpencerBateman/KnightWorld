@@ -62,5 +62,7 @@ namespace Knightworld.Core
 
         public static List<string> FindRoute(string fromId, string toId, Func<string, string, bool> canUse) =>
             Map.FindRoute(fromId, toId, canUse);
+
+        public static IReadOnlyList<QuestPassengerDef> QuestPassengers => Map.QuestPassengers;
     }
 }

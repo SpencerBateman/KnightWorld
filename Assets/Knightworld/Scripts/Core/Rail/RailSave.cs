@@ -21,6 +21,7 @@ namespace Knightworld.Core
         public long TravelDepartUtcTicks;
         public float TravelDurationSeconds;
         public List<string> Unlocked = new List<string>();
+        public List<string> CompletedQuests = new List<string>();
         public List<PassengerRec> Onboard = new List<PassengerRec>();
         public List<PassengerRec> Waiting = new List<PassengerRec>();
 
@@ -32,7 +33,9 @@ namespace Knightworld.Core
                 Name = person.Name,
                 OriginId = person.OriginId,
                 DestId = person.DestId,
-                Fare = person.Fare
+                Fare = person.Fare,
+                IsQuest = person.IsQuest,
+                QuestKey = person.QuestKey ?? ""
             };
         }
 
@@ -43,12 +46,21 @@ namespace Knightworld.Core
             public string OriginId;
             public string DestId;
             public int Fare;
+            public bool IsQuest;
+            public string QuestKey;
 
             public Passenger ToPassenger()
             {
                 if (string.IsNullOrEmpty(OriginId) || string.IsNullOrEmpty(DestId))
                     return null;
-                return new Passenger(Id, string.IsNullOrEmpty(Name) ? "Rider" : Name, OriginId, DestId, Fare);
+                return new Passenger(
+                    Id,
+                    string.IsNullOrEmpty(Name) ? "Rider" : Name,
+                    OriginId,
+                    DestId,
+                    Fare,
+                    string.IsNullOrEmpty(QuestKey) ? null : QuestKey,
+                    IsQuest);
             }
         }
     }
@@ -79,6 +91,8 @@ namespace Knightworld.Core
             }));
             for (int i = 0; i < state.Unlocked.Count; i++)
                 Field(text, "unlock", state.Unlocked[i]);
+            for (int i = 0; i < state.CompletedQuests.Count; i++)
+                Field(text, "questdone", state.CompletedQuests[i]);
             for (int i = 0; i < state.Onboard.Count; i++)
                 Field(text, "onboard", PassengerLine(state.Onboard[i]));
             for (int i = 0; i < state.Waiting.Count; i++)
@@ -137,6 +151,9 @@ namespace Knightworld.Core
                     case "unlock":
                         state.Unlocked.Add(value);
                         break;
+                    case "questdone":
+                        state.CompletedQuests.Add(value);
+                        break;
                     case "onboard":
                         ReadPassenger(state.Onboard, value);
                         break;
@@ -178,13 +195,16 @@ namespace Knightworld.Core
                 return;
             int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out int id);
             int.TryParse(parts[4], NumberStyles.Integer, CultureInfo.InvariantCulture, out int fare);
+            bool isQuest = parts.Length >= 6 && parts[5] == "1";
             list.Add(new RailSaveState.PassengerRec
             {
                 Id = id,
                 Name = Unescape(parts[1]),
                 OriginId = parts[2],
                 DestId = parts[3],
-                Fare = fare
+                Fare = fare,
+                IsQuest = isQuest,
+                QuestKey = parts.Length >= 7 ? Unescape(parts[6]) : ""
             });
         }
 
@@ -196,7 +216,9 @@ namespace Knightworld.Core
                 Escape(person.Name),
                 person.OriginId ?? "",
                 person.DestId ?? "",
-                person.Fare.ToString(CultureInfo.InvariantCulture)
+                person.Fare.ToString(CultureInfo.InvariantCulture),
+                person.IsQuest ? "1" : "0",
+                Escape(person.QuestKey ?? "")
             });
         }
 

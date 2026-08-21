@@ -63,6 +63,24 @@ namespace Knightworld.Core
         }
     }
 
+    public sealed class QuestPassengerDef
+    {
+        public string Name { get; }
+        public string PickupId { get; }
+        public string DropoffId { get; }
+        public int Payment { get; }
+
+        public QuestPassengerDef(string name, string pickupId, string dropoffId, int payment)
+        {
+            Name = name;
+            PickupId = pickupId;
+            DropoffId = dropoffId;
+            Payment = payment < 1 ? 1 : payment;
+        }
+
+        public string Key => Name;
+    }
+
     public sealed class RailroadMap
     {
         private readonly Dictionary<string, TownDef> _byId = new Dictionary<string, TownDef>(StringComparer.Ordinal);
@@ -78,6 +96,7 @@ namespace Knightworld.Core
         public IReadOnlyList<TownDef> Towns { get; }
         public IReadOnlyList<LandmarkDef> Landmarks { get; }
         public IReadOnlyList<LockedTrackDef> LockedTracks { get; }
+        public IReadOnlyList<QuestPassengerDef> QuestPassengers { get; }
 
         public RailroadMap(
             string title,
@@ -87,12 +106,14 @@ namespace Knightworld.Core
             IReadOnlyList<TownDef> towns,
             IReadOnlyList<LandmarkDef> landmarks,
             IReadOnlyDictionary<string, float> trackLengths,
-            IReadOnlyList<LockedTrackDef> lockedTracks = null)
+            IReadOnlyList<LockedTrackDef> lockedTracks = null,
+            IReadOnlyList<QuestPassengerDef> questPassengers = null)
         {
             Title = string.IsNullOrEmpty(title) ? "Railroad" : title;
             Towns = towns;
             Landmarks = landmarks ?? Array.Empty<LandmarkDef>();
             LockedTracks = lockedTracks ?? Array.Empty<LockedTrackDef>();
+            QuestPassengers = questPassengers ?? Array.Empty<QuestPassengerDef>();
             SecondsPerDistance = secondsPerDistance;
             MinHopSeconds = minHopSeconds;
             for (int i = 0; i < towns.Count; i++)

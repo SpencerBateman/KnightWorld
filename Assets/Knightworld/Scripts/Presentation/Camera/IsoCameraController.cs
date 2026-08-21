@@ -19,8 +19,11 @@ namespace Knightworld.Presentation
         public bool IgnorePan;
 
         private float _targetYaw;
+        private Vector3 _followAnchor;
+        private Vector3 _panOffset;
         private Vector3 _followTarget;
         private float _savedDistance;
+        private bool _following;
 
         public void FrameRoute(Vector3 from, Vector3 to)
         {
@@ -42,19 +45,24 @@ namespace Knightworld.Presentation
         public void FocusImmediate(Vector3 target)
         {
             LookTarget = target;
+            _followAnchor = target;
             _followTarget = target;
+            _panOffset = Vector3.zero;
             _targetYaw = Yaw;
             Apply();
         }
 
         public void Follow(Vector3 target)
         {
-            _followTarget = target;
+            _followAnchor = target;
+            _following = true;
+            _followTarget = _followAnchor + _panOffset;
         }
 
         private void Awake()
         {
             _targetYaw = Yaw;
+            _followAnchor = LookTarget;
             _followTarget = LookTarget;
         }
 
@@ -83,7 +91,7 @@ namespace Knightworld.Presentation
                         var yawRotation = Quaternion.Euler(0f, Yaw, 0f);
                         var right = yawRotation * Vector3.right;
                         var forward = yawRotation * Vector3.forward;
-                        _followTarget += (right * move.x + forward * move.y) * (PanSpeed * Time.deltaTime);
+                        _panOffset += (right * move.x + forward * move.y) * (PanSpeed * Time.deltaTime);
                     }
                 }
 
@@ -92,6 +100,8 @@ namespace Knightworld.Presentation
                 if (keyboard.eKey.wasPressedThisFrame)
                     _targetYaw += 90f;
             }
+
+            _followTarget = _followAnchor + _panOffset;
 
             var mouse = Mouse.current;
             if (mouse != null)

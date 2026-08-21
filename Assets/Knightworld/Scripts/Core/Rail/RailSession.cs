@@ -10,6 +10,8 @@ namespace Knightworld.Core
         public string OriginId { get; private set; }
         public string DestId { get; }
         public int Fare { get; private set; }
+        public bool IsQuest { get; }
+        public string QuestKey { get; }
 
         public Passenger(int id, string name, string originId, string destId)
             : this(id, name, originId, destId, FareBetween(originId, destId))
@@ -17,24 +19,38 @@ namespace Knightworld.Core
         }
 
         public Passenger(int id, string name, string originId, string destId, int fare)
+            : this(id, name, originId, destId, fare, null, false)
+        {
+        }
+
+        public Passenger(int id, string name, string originId, string destId, int fare, string questKey, bool isQuest)
         {
             Id = id;
             Name = name;
             OriginId = originId;
             DestId = destId;
             Fare = fare < 1 ? 1 : fare;
+            IsQuest = isQuest;
+            QuestKey = questKey;
+        }
+
+        public static Passenger FromQuest(int id, QuestPassengerDef quest)
+        {
+            return new Passenger(id, quest.Name, quest.PickupId, quest.DropoffId, quest.Payment, quest.Key, true);
         }
 
         public void Relocate(string townId)
         {
             OriginId = townId;
-            Fare = FareBetween(townId, DestId);
+            if (!IsQuest)
+                Fare = FareBetween(townId, DestId);
         }
 
         public void Relocate(string townId, int fare)
         {
             OriginId = townId;
-            Fare = fare < 1 ? 1 : fare;
+            if (!IsQuest)
+                Fare = fare < 1 ? 1 : fare;
         }
 
         public static int FareBetween(string fromId, string toId)
@@ -63,8 +79,8 @@ namespace Knightworld.Core
 
     public sealed class RailSession
     {
-        public const int StartingSeats = 1;
-        public const int SeatUpgradeCost = 50;
+        public const int StartingSeats = 3;
+        public const int SeatUpgradeCost = 10;
         public const int SeatUpgradeSeats = 1;
         public const int SeatUpgradeStock = 2;
         public const int CarriageCost = 350;
@@ -93,6 +109,7 @@ namespace Knightworld.Core
         public List<Passenger> Onboard { get; } = new List<Passenger>();
         public Dictionary<string, List<Passenger>> Waiting { get; } = new Dictionary<string, List<Passenger>>();
         private readonly HashSet<string> _unlocked = new HashSet<string>(StringComparer.Ordinal);
+        private readonly HashSet<string> _completedQuests = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         public int FreeSeats => SeatCount - Onboard.Count;
         public int SeatUpgradesLeft => SeatUpgradeStock - SeatUpgradesBought;
@@ -118,6 +135,8 @@ namespace Knightworld.Core
                 for (int n = 0; n < perTown; n++)
                     TrySpawnAt(RailroadGraph.Towns[t].Id);
             }
+
+            EnsureQuestPassenger();
         }
 
         public bool TrySpawnPassenger()
@@ -150,6 +169,7 @@ namespace Knightworld.Core
                     spawned++;
             }
 
+            EnsureQuestPassenger();
             return spawned;
         }
 
@@ -217,6 +237,7 @@ namespace Knightworld.Core
                 return false;
             Score -= locked.Cost;
             _unlocked.Add(key);
+            EnsureQuestPassenger();
             return true;
         }
 
@@ -303,12 +324,16 @@ namespace Knightworld.Core
                 {
                     Score += person.Fare;
                     scored = true;
+                    if (person.IsQuest && !string.IsNullOrEmpty(person.QuestKey))
+                        _completedQuests.Add(person.QuestKey);
                 }
                 else
                 {
-                    person.Relocate(CurrentTownId, OpenFare(CurrentTownId, person.DestId));
+                    person.Relocate(CurrentTownId, person.IsQuest ? person.Fare : OpenFare(CurrentTownId, person.DestId));
                     Waiting[CurrentTownId].Add(person);
                 }
+
+                EnsureQuestPassenger();
                 return true;
             }
 
@@ -484,6 +509,56 @@ namespace Knightworld.Core
             return choices[_random.NextInclusive(0, choices.Count - 1)];
         }
 
+        public bool HasQuestPassenger()
+        {
+            for (int i = 0; i < Onboard.Count; i++)
+            {
+                if (Onboard[i].IsQuest)
+                    return true;
+            }
+
+            foreach (var pair in Waiting)
+            {
+                for (int i = 0; i < pair.Value.Count; i++)
+                {
+                    if (pair.Value[i].IsQuest)
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        public bool IsQuestRouteCompletable(QuestPassengerDef quest)
+        {
+            if (quest == null)
+                return false;
+            if (!IsAccessible(quest.PickupId))
+                return false;
+            return RailroadGraph.FindRoute(quest.PickupId, quest.DropoffId, CanRide) != null;
+        }
+
+        public bool EnsureQuestPassenger()
+        {
+            if (HasQuestPassenger())
+                return false;
+            var quests = RailroadGraph.QuestPassengers;
+            for (int i = 0; i < quests.Count; i++)
+            {
+                var quest = quests[i];
+                if (_completedQuests.Contains(quest.Key))
+                    continue;
+                if (!IsQuestRouteCompletable(quest))
+                    continue;
+                if (!Waiting.ContainsKey(quest.PickupId))
+                    return false;
+                Waiting[quest.PickupId].Add(Passenger.FromQuest(_nextPassengerId++, quest));
+                return true;
+            }
+
+            return false;
+        }
+
         public RailSaveState Capture()
         {
             var state = new RailSaveState
@@ -504,6 +579,8 @@ namespace Knightworld.Core
             };
             foreach (var key in _unlocked)
                 state.Unlocked.Add(key);
+            foreach (var key in _completedQuests)
+                state.CompletedQuests.Add(key);
             for (int i = 0; i < Onboard.Count; i++)
                 state.Onboard.Add(RailSaveState.FromPassenger(Onboard[i]));
             foreach (var pair in Waiting)
@@ -537,6 +614,12 @@ namespace Knightworld.Core
                     session._unlocked.Add(state.Unlocked[i]);
             }
 
+            for (int i = 0; i < state.CompletedQuests.Count; i++)
+            {
+                if (!string.IsNullOrEmpty(state.CompletedQuests[i]))
+                    session._completedQuests.Add(state.CompletedQuests[i]);
+            }
+
             for (int i = 0; i < state.Onboard.Count; i++)
             {
                 var person = state.Onboard[i].ToPassenger();
@@ -560,6 +643,7 @@ namespace Knightworld.Core
                 session.TravelDurationSeconds = state.TravelDurationSeconds;
             }
 
+            session.EnsureQuestPassenger();
             return session;
         }
     }

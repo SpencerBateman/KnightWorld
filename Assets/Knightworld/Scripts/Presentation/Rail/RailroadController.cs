@@ -12,6 +12,9 @@ namespace Knightworld.Presentation
     {
         public const string SceneName = "Railroad";
 
+        /// <summary>When true, the next Railroad start skips the station overlay (same as pressing Depart).</summary>
+        public static bool StartDeparted;
+
         private RailSession _session;
         private RailroadView _view;
         private RailroadHud _hud;
@@ -44,6 +47,8 @@ namespace Knightworld.Presentation
             _view.RefreshPassengers(_session);
             _hud.Refresh(_session, null);
             DateTime now = DateTime.UtcNow;
+            bool startDeparted = StartDeparted;
+            StartDeparted = false;
             if (_session.FinishTravelIfDue(now))
             {
                 Save();
@@ -55,12 +60,18 @@ namespace Knightworld.Presentation
             {
                 StartCoroutine(Ride(_session.TravelFromId, _session.TravelToId));
             }
+            else if (startDeparted)
+            {
+                _view.SnapTrain(_session.CurrentTownId);
+                OnDepart();
+            }
             else
             {
                 _view.SnapTrain(_session.CurrentTownId);
                 OpenStation("Click a traveler to add them. Click a passenger to drop them off.");
             }
 
+            _session.EnsureQuestPassenger();
             SnapCameraToTrain();
         }
 

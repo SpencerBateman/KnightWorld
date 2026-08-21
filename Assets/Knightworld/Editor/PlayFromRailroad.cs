@@ -2,14 +2,11 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 
 [InitializeOnLoad]
-public static class PlayFromRailroad
+public static class PlayFromOpenScene
 {
-    private const string ScenePath = "Assets/Knightworld/Scenes/Railroad.unity";
-
-    static PlayFromRailroad()
+    static PlayFromOpenScene()
     {
-        var scene = AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath);
-        if (scene != null)
-            EditorSceneManager.playModeStartScene = scene;
+        // Play whatever scene is open in the editor (do not force Railroad).
+        EditorSceneManager.playModeStartScene = null;
     }
 }

@@ -146,7 +146,11 @@ namespace Knightworld.Presentation
                 string label = onboard
                     ? (here ? $"{person.Name}  ·  drop off here    {person.Fare}" : $"{person.Name}  →  {destName}    {person.Fare}")
                     : $"{person.Name}  →  {destName}    {person.Fare}";
-                Color color = here
+                if (person.IsQuest)
+                    label = "Quest · " + label;
+                Color color = person.IsQuest
+                    ? Gold
+                    : here
                     ? Gold
                     : Mix(RailroadMaterials.TownColor(person.DestId), new Color(0.12f, 0.14f, 0.18f), 0.45f);
                 int id = person.Id;

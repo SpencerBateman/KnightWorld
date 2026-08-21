@@ -26,6 +26,8 @@ namespace Knightworld.Core
             var tracks = new List<TrackDraft>();
             var locked = new List<LockedDraft>();
             var landmarks = new List<LandmarkDef>();
+            var quests = new List<QuestDraft>();
+            var questNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var lines = text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
             for (int i = 0; i < lines.Length; i++)
             {
@@ -67,8 +69,11 @@ namespace Knightworld.Core
                             Need(tokens, 3, "landmark <lake|marsh> <townId>");
                             landmarks.Add(ParseLandmark(tokens));
                             break;
+                        case "quest":
+                            quests.Add(ParseQuest(tokens, questNames));
+                            break;
                         default:
-                            throw new RailroadMapException("Unknown command '" + tokens[0] + "'. Use title, start, speed, minhop, town, track, locked, or landmark.");
+                            throw new RailroadMapException("Unknown command '" + tokens[0] + "'. Use title, start, speed, minhop, town, track, locked, quest, or landmark.");
                     }
                 }
                 catch (RailroadMapException ex)
@@ -145,7 +150,20 @@ namespace Knightworld.Core
                 keptLandmarks.Add(landmarks[i]);
             }
 
-            return new RailroadMap(title, start, speed, minHop, defs, keptLandmarks, lengths, lockedTracks);
+            var keptQuests = new List<QuestPassengerDef>();
+            for (int i = 0; i < quests.Count; i++)
+            {
+                var draft = quests[i];
+                if (!byId.ContainsKey(draft.PickupId))
+                    throw new RailroadMapException("quest pickup town '" + draft.PickupId + "' is not defined.");
+                if (!byId.ContainsKey(draft.DropoffId))
+                    throw new RailroadMapException("quest dropoff town '" + draft.DropoffId + "' is not defined.");
+                if (draft.PickupId == draft.DropoffId)
+                    throw new RailroadMapException("quest " + draft.Name + " pickup and dropoff cannot be the same town.");
+                keptQuests.Add(new QuestPassengerDef(draft.Name, draft.PickupId, draft.DropoffId, draft.Payment));
+            }
+
+            return new RailroadMap(title, start, speed, minHop, defs, keptLandmarks, lengths, lockedTracks, keptQuests);
         }
 
         private static void AddTrack(
@@ -230,6 +248,25 @@ namespace Knightworld.Core
             }
 
             return locked;
+        }
+
+        private static QuestDraft ParseQuest(List<string> tokens, HashSet<string> questNames)
+        {
+            Need(tokens, 5, "quest <name> <pickup> <dropoff> <payment>");
+            if (tokens.Count > 5)
+                throw new RailroadMapException("Too many values. Use quest <name> <pickup> <dropoff> <payment>.");
+            string name = tokens[1];
+            if (string.IsNullOrWhiteSpace(name))
+                throw new RailroadMapException("Quest passenger name is empty.");
+            if (!questNames.Add(name))
+                throw new RailroadMapException("Duplicate quest passenger '" + name + "'.");
+            return new QuestDraft
+            {
+                Name = name,
+                PickupId = NormalizeId(tokens[2]),
+                DropoffId = NormalizeId(tokens[3]),
+                Payment = ParseCost(tokens[4])
+            };
         }
 
         private static LandmarkDef ParseLandmark(List<string> tokens)
@@ -360,6 +397,14 @@ namespace Knightworld.Core
             public string B;
             public float? Length;
             public int Cost;
+        }
+
+        private sealed class QuestDraft
+        {
+            public string Name;
+            public string PickupId;
+            public string DropoffId;
+            public int Payment;
         }
     }
 }

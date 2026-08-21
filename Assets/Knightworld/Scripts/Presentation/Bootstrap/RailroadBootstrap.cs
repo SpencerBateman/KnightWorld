@@ -44,7 +44,6 @@ namespace Knightworld.Bootstrap
             iso.MaxDistance = 32f;
             iso.Pitch = 48f;
             iso.FollowLerp = 10f;
-            iso.IgnorePan = true;
             iso.FocusImmediate(view.Train.position);
             view.ApplyCamera(camera);
 

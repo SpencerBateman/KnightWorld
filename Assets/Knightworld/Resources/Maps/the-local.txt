@@ -27,6 +27,11 @@
 #        station screen. Same as track, with a point cost at the end:
 #              locked sc hidden 5 100
 #
+#   quest <name> <pickup> <dropoff> <payment>
+#        One-of-a-kind quest passenger. Spawns when their route is
+#        completable on the paid network and no quest is already waiting:
+#              quest Spencer sc ny 100
+#
 #   landmark lake <townId>
 #   landmark marsh <townId>
 #
@@ -65,6 +70,7 @@ track hiddenbeach hiddenpoint 6
 locked outskirts hidden 7 100
 track hiddenbeach hidden 9
 
+quest Spencer sc ny 100
 
 
 # landmark lake lakeside

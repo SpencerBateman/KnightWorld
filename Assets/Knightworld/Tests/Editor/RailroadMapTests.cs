@@ -212,6 +212,25 @@ lock a b 6 25
         }
 
         [Test]
+        public void ParsesQuestPassengers()
+        {
+            var map = RailroadMapParser.Parse(@"
+start sc
+town sc SanClemente
+town ny NewYork
+track sc ny 4
+quest Spencer sc ny 100
+quest ""Ada Jones"" sc ny 50
+");
+            Assert.AreEqual(2, map.QuestPassengers.Count);
+            Assert.AreEqual("Spencer", map.QuestPassengers[0].Name);
+            Assert.AreEqual("sc", map.QuestPassengers[0].PickupId);
+            Assert.AreEqual("ny", map.QuestPassengers[0].DropoffId);
+            Assert.AreEqual(100, map.QuestPassengers[0].Payment);
+            Assert.AreEqual("Ada Jones", map.QuestPassengers[1].Name);
+        }
+
+        [Test]
         public void DefaultMapParsesWithTenTowns()
         {
             var map = RailroadMapParser.Parse(RailroadMaps.TheLocal);

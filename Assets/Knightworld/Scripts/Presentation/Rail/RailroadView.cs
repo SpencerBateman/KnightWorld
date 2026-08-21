@@ -147,7 +147,7 @@ namespace Knightworld.Presentation
             var hit = go.AddComponent<SphereCollider>();
             hit.radius = 0.42f;
 
-            var body = LowPoly.Child(PrimitiveType.Capsule, "Body", go.transform, Vector3.zero, new Vector3(0.32f, 0.38f, 0.32f), RailroadMaterials.Town(person.DestId));
+            var body = LowPoly.Child(PrimitiveType.Capsule, "Body", go.transform, Vector3.zero, new Vector3(0.32f, 0.38f, 0.32f), person.IsQuest ? RailroadMaterials.Sun : RailroadMaterials.Town(person.DestId));
             return go.transform;
         }
 
